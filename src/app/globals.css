@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f9f9ff;
+    --foreground: #181d26;
+
+    --surface-low: #f0f3ff;
+    --surface-lowest: #ffffff;
+    --surface-bright: #ffffff;
+    
+    --primary: #0049a3;
+    --primary-container: #1b61c9;
+    --on-primary: #ffffff;
+
+    --outline-variant: #c2c6d5;
+    
+    --shadow-ambient: 0px 12px 32px rgba(23, 28, 37, 0.06);
+    --shadow-glass: 0px 4px 12px rgba(10, 90, 194, 0.04), 0px 16px 32px rgba(10, 90, 194, 0.06);
+  }
+
+  /* Force Light Mode layout for this B2B Dashboard */
+  body {
+    color: var(--foreground);
+    background-color: var(--background);
+    font-family: inherit;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.01em; 
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+  }
+  .ghost-border {
+    border: 1px solid rgba(194, 198, 213, 0.4);
+  }
+  .gradient-btn {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+    color: var(--on-primary);
+  }
+}
