@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { newProject, type Project } from '../src/domain/schema';
-import { editDocument, importContent, importResearch, restoreDocumentVersion } from '../src/domain/workflow';
+import { editDocument, importContent, importFreeformDraft, importResearch, restoreDocumentVersion } from '../src/domain/workflow';
 import { buildZip, downloadableText, serializeDocument, serializeMarkdown } from '../src/lib/export';
 
 const fixture = (name: string) => readFileSync(join(process.cwd(), 'tests/fixtures/manual', name), 'utf8');
@@ -45,6 +45,11 @@ describe('허구의 여섯 채널 기능 검수', () => {
     expect(() => importResearch(p, '브랜드가 좋고 모두 추천합니다.')).toThrow('응답 형식');
     const content = `# alc.content.v1\nrequestId: fixture-request\n## blog\n- heading | 무엇을 살펴볼까요? | \n- paragraph | 뚜껑을 확인해 보세요. | `;
     expect(importContent(p, content).documents.blog?.status).toBe('outline');
+    const preserved = importFreeformDraft(p, 'blog', '다듬어야 할 자유 형식 본문');
+    expect(preserved.documents.blog?.blocks[0].text).toBe('다듬어야 할 자유 형식 본문');
+    expect(preserved.documents.blog?.blocks[0].claimRefs).toEqual([]);
+    expect(preserved.documents.ad_copy).toBeUndefined();
+    expect(importFreeformDraft(p, 'blog', '성능 99% 입증').documents.blog?.status).toBe('blocked');
   });
   it('한 채널 편집과 이전 버전 복원은 다른 채널의 내용을 지우지 않는다', () => {
     const written = importContent(project(), fixture('content.six.json'));

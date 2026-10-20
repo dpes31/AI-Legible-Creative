@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { channelNames, type Channel } from '@/domain/schema';
-import { editDocument, importContent, prepareContent, restoreDocumentVersion, reviewBlock, reviewDocument } from '@/domain/workflow';
+import { editDocument, importContent, importFreeformDraft, prepareContent, restoreDocumentVersion, reviewBlock, reviewDocument } from '@/domain/workflow';
 import { downloadBlob, downloadableText, downloadZip, serializeDocument, serializeMarkdown, serializeWithSources } from '@/lib/export';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 
@@ -71,7 +71,15 @@ export default function ResultsPage() {
           <button type="button" className="button text" onClick={() => void navigator.clipboard.writeText(prompt).then(() => setNotice('작성 요청문을 복사했습니다.')).catch(() => setError('복사가 되지 않았어요. 요청문을 선택해 복사해 주세요.'))}>요청문 복사</button></div>}
         {project.manualContentRequestId && <div className="field"><label htmlFor="content-response">AI에서 받은 작성 결과 붙여넣기</label>
           <textarea id="content-response" value={response} onChange={e => setResponse(e.target.value)} style={{ minHeight: 140 }} placeholder="요청 ID와 채널이 구분된 응답을 붙여넣어 주세요." />
-          <button type="button" className="button" onClick={pasteContent} disabled={!response.trim()}>채널별 문구 가져오기</button></div>}
+          <button type="button" className="button" onClick={pasteContent} disabled={!response.trim()}>채널별 문구 가져오기</button>
+          <details><summary>형식을 읽지 못했다면</summary><p className="small muted">붙여넣은 원문을 현재 선택한 채널 하나에 근거 없는 검토용 초안으로 보관할 수 있습니다. 저장 전에 채널과 글의 내용을 확인해 주세요.</p>
+            <button type="button" className="button secondary" disabled={!response.trim()} onClick={() => {
+              try {
+                if (project.documents[current] && !window.confirm('기존 문구를 이전 버전으로 보관하고 이 초안을 가져올까요?')) return;
+                update(importFreeformDraft(project, current, response)); setError(''); setNotice(`${channelNames[current]}에 원문을 검토용 초안으로 보관했습니다.`);
+                setResponse('');
+              } catch (cause) { setError(cause instanceof Error ? cause.message : '본문을 보관하지 못했어요.'); }
+            }}>현재 채널의 초안으로 보관</button></details></div>}
       </section>
       <aside className="card soft"><h2>문구의 사용 상태</h2>
         <p>검토용 초안은 복사할 수 있지만 확인 상태가 함께 표시됩니다. 외부 AI가 적은 링크만으로 사실이 확인되지는 않습니다.</p>

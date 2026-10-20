@@ -288,6 +288,25 @@ export function importContent(project: Project, response: string): Project {
     migrationNote: [...data.unresolvedItems, ...rejected, ...missing].length ? `작성 후 확인: ${[...data.unresolvedItems, ...rejected, ...missing].join(' · ')}` : project.migrationNote };
 }
 
+export function importFreeformDraft(project: Project, channel: typeof channels[number], response: string): Project {
+  const body = response.trim();
+  if (!project.selectedChannels.includes(channel) || !body || body.length > 25000) {
+    throw new ImportError('보관할 채널과 2만 5천 자 이하의 본문을 확인해 주세요.');
+  }
+  const previous = project.documents[channel];
+  const draft = validateDocument(project, {
+    id: previous?.id || crypto.randomUUID(), channel,
+    blocks: [{ id: crypto.randomUUID(), kind: 'paragraph', text: body, claimRefs: [] }],
+    revision: (previous?.revision || 0) + 1, evidenceRevision: project.evidenceRevision,
+    reviewedBlocks: {}, validationHash: null, status: 'needs_review', warnings: [], updatedAt: new Date().toISOString(),
+  });
+  return { ...project,
+    documents: { ...project.documents, [channel]: draft },
+    documentHistory: previous ? { ...project.documentHistory, [channel]: [...(project.documentHistory[channel] || []), previous] } : project.documentHistory,
+    migrationNote: '자유 형식 응답을 선택한 채널의 검토용 초안으로 보관했습니다. 근거 번호는 연결되지 않았습니다. 출처와 사실을 다시 확인해 주세요.',
+  };
+}
+
 export function editDocument(project: Project, channel: typeof channels[number], blocks: ChannelDocument['blocks']): Project {
   const prior = project.documents[channel];
   if (!prior) throw new ImportError('이 채널의 문서를 찾지 못했습니다.');
