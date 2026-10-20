@@ -27,6 +27,23 @@ describe('사실과 프로젝트의 무결성', () => {
         otherClaimIds: [], comparable: false, verdict: 'unknown', reason: '' }],
     })).toThrow();
   });
+  it('같은 이름의 제품도 모델은 별도 작업 필드와 요청문으로 구별한다', () => {
+    const older = newProject({ ...project(), model: '2024년형' });
+    const newer = newProject({ ...project(), model: '2026년형' });
+    expect(older.id).not.toBe(newer.id);
+    expect(prepareResearch(newer).prompt).toContain('모델: 2026년형');
+    expect(prepareResearch(older).prompt).not.toContain('2026년형');
+    const sourceId = crypto.randomUUID();
+    const withOldClaim = { ...newer,
+      sources: [{ id: sourceId, projectId: newer.id, title: '구형 설명', url: null,
+        excerpt: '2024년형은 빨간색입니다.', body: '2024년형은 빨간색입니다.', sourceType: 'user' as const,
+        retrieval: 'user_provided' as const, origin: 'direct_input' as const, publishedAt: null,
+        collectedAt: newer.createdAt, externalAiAllowed: false, publicationAllowed: true, hash: 'old' }],
+      claims: [{ id: crypto.randomUUID(), projectId: newer.id, statement: '빨간색', sourceId,
+        quote: '2024년형은 빨간색입니다.', conditions: '', subject: '2024년형', status: 'unreviewed' as const, reviewedBy: null }],
+    };
+    expect(() => verifyClaim(withOldClaim, withOldClaim.claims[0].id)).toThrow('현재 모델');
+  });
   it('빈 분석과 다른 프로젝트의 응답을 거절한다', () => {
     const p = prepareResearch(project()).project;
     expect(() => importResearch(p, '{}')).toThrow();

@@ -66,6 +66,7 @@ export const documentSchema = z.object({
 export type ChannelDocument = z.infer<typeof documentSchema>;
 export const projectSchema = z.object({
   schemaVersion: z.literal(2), id, ownerId: id, name: shortText, kind: z.enum(['brand', 'product', 'service']),
+  model: z.string().max(300).default(''),
   description: z.string().max(1000), officialUrl: webUrl.or(z.literal('')),
   objective: objectiveSchema, audience: z.string().max(1000), audienceUndecided: z.boolean(),
   market: z.string().default('KR'), language: z.string().default('ko'),
@@ -143,7 +144,7 @@ export const contentImportSchema = z.object({
 });
 export type ContentImport = z.infer<typeof contentImportSchema>;
 
-export function newProject(input: Pick<Project, 'name' | 'kind' | 'description' | 'officialUrl' | 'objective' | 'audience' | 'audienceUndecided' | 'selectedChannels' | 'mode'>): Project {
+export function newProject(input: Pick<Project, 'name' | 'kind' | 'description' | 'officialUrl' | 'objective' | 'audience' | 'audienceUndecided' | 'selectedChannels' | 'mode'> & { model?: string }): Project {
   const now = new Date().toISOString();
   return projectSchema.parse({
     ...input, schemaVersion: 2, id: crypto.randomUUID(), ownerId: 'local', market: 'KR', language: 'ko',

@@ -11,6 +11,7 @@ export default function Home() {
   const { project, loading, create, update } = useWorkspace();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'brand' | 'product' | 'service'>('product');
+  const [model, setModel] = useState('');
   const [description, setDescription] = useState('');
   const [objective, setObjective] = useState<Objective>('sales');
   const [audience, setAudience] = useState('');
@@ -24,10 +25,10 @@ export default function Home() {
 
   const editCurrent = () => {
     if (!project) return;
-    setName(project.name); setKind(project.kind); setDescription(project.description);
+    setName(project.name); setKind(project.kind); setModel(project.model); setDescription(project.description);
     setObjective(project.objective); setAudience(project.audience); setAudienceUndecided(project.audienceUndecided);
     setOfficialUrl(project.officialUrl); setSelectedChannels(project.selectedChannels); setMode(project.mode);
-    setEditing(true); setMessage('대상 자체를 바꾸면 자료가 섞이지 않도록 새 작업으로 만듭니다.');
+    setEditing(true); setMessage('대상 이름·모델·기존 공식 링크를 바꾸면 자료가 섞이지 않도록 새 작업으로 만듭니다.');
   };
 
   const toggle = (channel: Channel) => setSelectedChannels(current => current.includes(channel) ? current.filter(x => x !== channel) : [...current, channel]);
@@ -38,9 +39,10 @@ export default function Home() {
     }
     setPending(true); setMessage('');
     try {
-      const input = { name: name.trim(), kind, description: description.trim(), officialUrl: officialUrl.trim(),
+      const input = { name: name.trim(), kind, model: kind === 'product' ? model.trim() : '', description: description.trim(), officialUrl: officialUrl.trim(),
         objective, audience: audience.trim(), audienceUndecided, selectedChannels, mode };
-      if (editing && project && project.name === input.name && project.kind === input.kind) {
+      if (editing && project && project.name === input.name && project.kind === input.kind && project.model === input.model &&
+          (!project.officialUrl || project.officialUrl === input.officialUrl)) {
         const analyticalChange = project.objective !== input.objective || project.audience !== input.audience ||
           project.audienceUndecided !== input.audienceUndecided || project.description !== input.description || project.officialUrl !== input.officialUrl;
         update({ ...project, ...input, inputRevision: project.inputRevision + 1,
@@ -65,7 +67,7 @@ export default function Home() {
       <p className="muted">고객의 질문, 경쟁 제품과의 차이, 확인할 근거를 한 번에 정리합니다. 검색·AI의 추천이나 학습을 보장하지는 않습니다.</p>
     </section>
     {!loading && project && <div className="card soft row">
-      <div style={{ flex: 1 }}><strong>진행 중인 작업: {project.name}</strong><p className="small muted">입력과 작성한 내용은 이 브라우저에 남아 있습니다.</p></div>
+      <div style={{ flex: 1 }}><strong>진행 중인 작업: {project.name}{project.model ? ` · ${project.model}` : ''}</strong><p className="small muted">입력과 작성한 내용은 이 브라우저에 남아 있습니다.</p></div>
       <button className="button secondary" type="button" onClick={editCurrent}>입력 고치기</button><Link className="button secondary" href="/review">이어서 분석하기</Link><Link className="button secondary" href="/results">결과 확인하기</Link>
     </div>}
     <div className="grid"><form className="card" onSubmit={submit}>
@@ -84,6 +86,8 @@ export default function Home() {
         <label className="row"><input type="checkbox" checked={audienceUndecided} onChange={event => setAudienceUndecided(event.target.checked)} />아직 정하지 않았어요</label>
       </div>
       <details><summary>자료와 결과물 선택하기</summary>
+        {kind === 'product' && <div className="field"><label htmlFor="model">정확한 모델명, 있다면</label>
+          <input id="model" value={model} onChange={event => setModel(event.target.value)} placeholder="예: 2026년형 A100" /></div>}
         <div className="field"><label htmlFor="description">한 줄 설명 또는 강조하고 싶은 특징</label>
           <textarea id="description" value={description} onChange={event => setDescription(event.target.value)} placeholder="입력한 장점은 확인할 주장으로 다룹니다." /></div>
         <div className="field"><label htmlFor="official-url">공식 제품·서비스 링크</label>

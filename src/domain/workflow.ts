@@ -53,7 +53,7 @@ export function prepareResearch(project: Project): { project: Project; prompt: s
     prompt: [
       '다음 브랜드·제품을 조사해 주세요. 모르는 사실을 추측하거나 URL·수치·시험 조건을 만들지 마세요.',
       `요청 ID: ${requestId}`,
-      `대상: ${project.name} (${project.kind}); 설명: ${project.description || '제공되지 않음'}`,
+      `대상: ${project.name} (${project.kind}); 모델: ${project.model || '미지정'}; 설명: ${project.description || '제공되지 않음'}`,
       `공식 링크: ${project.officialUrl || '제공되지 않음'}`,
       `목적: ${project.objective}; 고객 상황: ${project.audienceUndecided ? '아직 정하지 않음' : project.audience}`,
       `외부 AI 전달을 허용한 자료: ${sharedText || '없음'}`,
@@ -62,7 +62,7 @@ export function prepareResearch(project: Project): { project: Project; prompt: s
       'JSON만 반환하세요. 필수 항목은 contract, requestId, entity, sources, claims, questions, comparisons, recommendations, missingEvidence입니다.',
       `contract는 alc.research.v1, requestId는 ${requestId}, entity는 {"name":"${project.name.replaceAll('"', '\\"')}"}입니다.`,
       'sources 각 항목: {"ref":"S1","title":"문서명","url":null,"excerpt":"실제 확인한 원문","sourceType":"official|test|independent|review|user"}.',
-      'claims 각 항목: {"ref":"C1","statement":"검증할 주장","sourceRef":"S1","quote":"원문의 정확한 구간","conditions":"조건","subject":"대상"}.',
+      'claims 각 항목: {"ref":"C1","statement":"검증할 주장","sourceRef":"S1","quote":"원문의 정확한 구간","conditions":"조건","subject":"정확한 대상·모델"}. 모델을 지정한 제품은 subject에도 해당 모델명을 넣으세요.',
       'questions 각 항목: {"ref":"Q1","text":"고객 질문","provenance":"observed|reconstructed|hypothesis","sourceRefs":["S1"]}.',
       'comparisons 각 항목: {"ref":"K1","competitor":"대상","criterion":"비교 기준","ownClaimRefs":["C1"],"otherClaimRefs":[],"comparable":false,"verdict":"unknown","reason":"비교 자료 부족"}.',
       'recommendations 각 항목: {"ref":"R1","situation":"고객 상황","reason":"선택 이유","claimRefs":["C1"],"comparisonRefs":["K1"],"limitation":"적용되지 않는 경우"}.',
@@ -138,6 +138,9 @@ export function importResearch(project: Project, response: string): Project {
 export function verifyClaim(project: Project, claimId: string): Project {
   const claim = project.claims.find(c => c.id === claimId);
   const source = project.sources.find(s => s.id === claim?.sourceId);
+  if (claim && project.model && !claim.subject.includes(project.model)) {
+    throw new ImportError('이 주장이 현재 모델에 관한 것인지 확인되지 않았어요. 모델명이 포함된 원문과 조사 응답을 보완해 주세요.');
+  }
   if (!claim || !source || source.origin === 'external_response' || !claim.quote || !normalize(source.body).includes(normalize(claim.quote))) {
     throw new ImportError('원문에서 해당 인용 구간을 찾지 못했습니다. 근거를 보완해 주세요.');
   }
@@ -181,7 +184,7 @@ export function prepareContent(project: Project): { project: Project; prompt: st
     project: { ...project, manualContentRequestId: requestId },
     prompt: [
       '다음 목적에 맞춰 한국어 콘텐츠를 채널별로 작성해 주세요. 없는 수치·인증·경쟁 우위·후기·인용문·영상 타임코드를 만들지 마세요.',
-      `requestId: ${requestId}; 대상: ${project.name}; 목적: ${project.objective}; 고객: ${project.audienceUndecided ? '아직 미정' : project.audience}`,
+      `requestId: ${requestId}; 대상: ${project.name}; 모델: ${project.model || '미지정'}; 목적: ${project.objective}; 고객: ${project.audienceUndecided ? '아직 미정' : project.audience}`,
       `선택 채널: ${channelList}`,
       `사용 가능한 주장과 조건: ${approved.map(c => `[${c.id}] ${c.statement}${c.conditions ? ` (조건: ${c.conditions})` : ''}`).join('\n') || '확인된 사실 없음. 사실을 추가하지 말고 자료 보완용 구성안만 작성하세요.'}`,
       `근거가 연결된 선택 이유 후보(고객 적합성은 여전히 검토 필요): ${supportedReasons.map(r => `${r.reason} / 한계: ${r.limitation}`).join('; ') || '확인한 선택 이유 없음. 경쟁 우위를 주장하지 마세요.'}`,

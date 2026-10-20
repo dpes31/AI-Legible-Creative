@@ -27,6 +27,7 @@ describe('유료 실행의 경계', () => {
     expect((await executeStage(provider, 'research', project, 'run-1')).requestId).toBe('mock-1');
     expect((await executeStage(provider, 'normalize', project, 'run-1', result)).text).toBe(result.text);
     expect(inputHash({ ...project, audience: '바뀐 고객' })).not.toBe(inputHash(project));
+    expect(inputHash({ ...project, model: '2026년형' })).not.toBe(inputHash(project));
   });
   it('거절·중단·빈 응답을 성공으로 포장하지 않는다', () => {
     expect(() => inspectResponse({ id: 'r', status: 'incomplete', output_text: '', output: [] })).toThrow(ProviderFailure);

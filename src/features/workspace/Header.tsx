@@ -21,7 +21,7 @@ export function Header() {
           <label htmlFor="project-switch">작업</label>
           <select id="project-switch" value={project?.id ?? ''} onChange={event => void select(event.target.value)}>
             {!project && <option value="">새 작업</option>}
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}{p.model ? ` · ${p.model}` : ''}</option>)}
           </select>
           <Link href="/settings" className="quiet-link">설정</Link>
         </div>
