@@ -3,153 +3,108 @@
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { channelNames, type Channel } from '@/domain/schema';
-import { editDocument, importContent, importFreeformDraft, prepareContent, restoreDocumentVersion, reviewBlock, reviewDocument } from '@/domain/workflow';
-import { downloadBlob, downloadableText, downloadZip, serializeDocument, serializeMarkdown, serializeWithSources } from '@/lib/export';
+import { channelNames, type Channel, type ChannelDocument } from '@/domain/schema';
+import { applyDocumentProposal, checkCurrentDocument, editDocument, restoreDocumentVersion, reviewBlock, reviewDocument, updateDocumentText } from '@/domain/workflow';
+import { downloadBlob, downloadableMarkdown, downloadableText, downloadZip, serializeDocument } from '@/lib/export';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
+import { ManualExchange } from '@/features/manual/ManualExchange';
+import styles from '@/features/results/Results.module.css';
+
+const statusNames: Record<ChannelDocument['status'], string> = { ready: '현재 버전 확인', blocked: '근거 보완 필요', outline: '자료 보완용 구성안', stale: '수정 후 다시 확인', needs_review: '검토용 초안' };
+const blockNames = { heading: '제목', paragraph: '본문', bullet: '항목', cta: '행동 안내', note: '작성 메모 (복사 본문에서 제외)' };
 
 export default function ResultsPage() {
   return <Suspense fallback={<p role="status">문구를 불러오는 중입니다…</p>}><ResultsWorkspace /></Suspense>;
 }
-
 function ResultsWorkspace() {
   const { project, loading, update } = useWorkspace();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [prompt, setPrompt] = useState('');
-  const [promptId, setPromptId] = useState<string | null>(null);
-  const [response, setResponse] = useState('');
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [edits, setEdits] = useState<Record<string, string>>({});
-
+  const router = useRouter(); const searchParams = useSearchParams();
+  const [error, setError] = useState(''); const [notice, setNotice] = useState('');
+  const [activeBlock, setActiveBlock] = useState(''); const [copyFallback, setCopyFallback] = useState('');
   if (loading) return <p role="status">문구를 불러오는 중입니다…</p>;
   if (!project) return <div className="card"><h1>먼저 알릴 대상을 정해 주세요.</h1><Link className="button" href="/">정보 입력하기</Link></div>;
-
-  const current: Channel = project.selectedChannels.find(item => item === searchParams.get('channel')) ?? project.selectedChannels[0];
-  const document = project.documents[current];
-  const visibleDocument = document && { ...document, blocks: document.blocks.map(block =>
-    edits[block.id] === undefined ? block : { ...block, text: edits[block.id] }),
-    status: Object.keys(edits).some(id => document.blocks.some(block => block.id === id)) ? 'stale' as const : document.status };
-  const currentProject = visibleDocument ? { ...project, documents: { ...project.documents, [current]: visibleDocument } } : project;
-  const createPrompt = () => {
-    const prepared = prepareContent(project); update(prepared.project); setPrompt(prepared.prompt); setPromptId(prepared.project.manualContentRequestId); setError('');
+  const current: Channel = project.selectedChannels.find(item => item === searchParams.get('channel')) || project.selectedChannels[0];
+  const document = project.documents[current]; const proposal = project.documentProposals[current];
+  const hasDocuments = Object.keys(project.documents).length > 0;
+  const selected = document?.blocks.find(b => b.id === activeBlock) || document?.blocks.find(b => b.kind !== 'note');
+  const refs = selected?.claimRefs || [];
+  const issues = document?.validation?.issues.filter(issue => issue.blockId === selected?.id || issue.blockId === 'document') || [];
+  const act = (operation: () => void, success?: string) => {
+    try { operation(); setError(''); if (success) setNotice(success); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '내용을 확인한 뒤 다시 시도해 주세요.'); }
   };
-  const pasteContent = () => {
-    try {
-      const incoming = importContent(project, response);
-      if (Object.keys(project.documents).some(key => incoming.documents[key as Channel] !== project.documents[key as Channel])) {
-        if (Object.keys(project.documents).length && !window.confirm('기존 문구를 이전 버전으로 보관하고 새 문구를 가져올까요?')) return;
-      }
-      update(incoming); setResponse(''); setError(''); setNotice('채널별 문구를 가져왔습니다. 근거와 표현을 확인해 주세요.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '작성 결과를 읽지 못했어요.'); }
-  };
+  const selectChannel = (channel: Channel) => { router.replace(`/results?channel=${channel}`, { scroll: false }); setActiveBlock(''); setError(''); setNotice(''); setCopyFallback(''); };
   const copy = async (withSources: boolean) => {
-    if (!visibleDocument || !serializeDocument(visibleDocument)) { setError('복사할 본문이 아직 없습니다.'); return; }
-    const body = downloadableText(project, visibleDocument, withSources);
-    try { await navigator.clipboard.writeText(body); setError(''); setNotice(withSources ? '본문과 공개 가능한 출처를 복사했습니다.' : '이 채널의 본문을 복사했습니다.'); }
-    catch { setError('클립보드에 복사하지 못했어요. 아래 본문을 직접 선택해 복사해 주세요.'); }
+    if (!document || !serializeDocument(document)) { setError('복사할 본문이 아직 없습니다.'); return; }
+    const body = downloadableText(project, document, withSources);
+    try { await navigator.clipboard.writeText(body); setError(''); setCopyFallback(''); setNotice(withSources ? '본문과 공개 가능한 출처를 복사했습니다.' : '이 채널의 본문을 복사했습니다.'); }
+    catch { setCopyFallback(body); setError('클립보드에 복사하지 못했어요. 아래 본문을 직접 선택해 복사해 주세요.'); }
   };
-  const edit = (blockId: string) => {
-    if (!document || edits[blockId] === undefined) return;
-    const blocks = document.blocks.map(b => b.id === blockId ? { ...b, text: edits[blockId] } : b);
-    update(editDocument(project, current, blocks));
-    setEdits(old => { const result = { ...old }; delete result[blockId]; return result; });
-    setNotice('수정 내용을 저장했습니다. 이 채널의 근거와 표현을 다시 확인해 주세요.');
-  };
-  const approve = () => {
-    if (Object.keys(edits).some(id => document?.blocks.some(block => block.id === id))) { setError('수정 중인 문구를 저장한 뒤 다시 확인해 주세요.'); return; }
-    try { update(reviewDocument(project, current)); setError(''); setNotice('현재 버전의 원문과 문구를 대조한 기록을 남겼습니다.'); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '아직 최종본으로 표시할 수 없습니다.'); }
-  };
+  const publicBlocks = document?.blocks.filter(b => b.kind !== 'note') || [];
   return <>
-    <section className="hero"><div className="eyebrow">3. 결과 받기</div><h1>채널에 맞는 문구를 각각 만듭니다.</h1>
-      <p className="muted">하나의 본문을 여섯 탭에 복제하지 않습니다. 근거가 부족한 문구는 검토용 초안으로 표시합니다.</p></section>
-    {project.migrationNote && <p className="alert" role="status">{project.migrationNote}</p>}
+    <div className={styles.heading}><div><div className="eyebrow">3. 결과 받기</div><h1>필요한 문구부터 골라 쓰세요.</h1><p>{project.name} · 선택한 채널 {project.selectedChannels.length}개</p></div><Link href="/review" className="quiet-link small">분석 다시 보기 ↗</Link></div>
     {error && <p className="alert" role="alert">{error}</p>}
     {notice && <p className="small muted" role="status">{notice}</p>}
-    <div className="grid">
-      <section className="card"><h2>작성 요청문 만들기</h2>
-        {!project.claims.some(c => c.status === 'supported') && <p className="alert small">확인된 제품 사실이 없습니다. 원문을 확인하거나 ‘자료 보완용 구성안’으로 시작할 수 있습니다.</p>}
-        {project.mode === 'automatic' && <p className="alert small">유료 API 연결 전입니다. 외부 AI로 직접 작성할 수 있습니다.</p>}
-        <button type="button" className="button secondary" onClick={createPrompt}>채널별 작성 요청문 만들기</button>
-        {prompt && promptId === project.manualContentRequestId && <div className="field"><label htmlFor="content-prompt">외부 AI에 보낼 요청문</label>
-          <textarea id="content-prompt" readOnly value={prompt} style={{ minHeight: 190 }} />
-          <button type="button" className="button text" onClick={() => void navigator.clipboard.writeText(prompt).then(() => setNotice('작성 요청문을 복사했습니다.')).catch(() => setError('복사가 되지 않았어요. 요청문을 선택해 복사해 주세요.'))}>요청문 복사</button></div>}
-        {project.manualContentRequestId && <div className="field"><label htmlFor="content-response">AI에서 받은 작성 결과 붙여넣기</label>
-          <textarea id="content-response" value={response} onChange={e => setResponse(e.target.value)} style={{ minHeight: 140 }} placeholder="요청 ID와 채널이 구분된 응답을 붙여넣어 주세요." />
-          <button type="button" className="button" onClick={pasteContent} disabled={!response.trim()}>채널별 문구 가져오기</button>
-          <details><summary>형식을 읽지 못했다면</summary><p className="small muted">붙여넣은 원문을 현재 선택한 채널 하나에 근거 없는 검토용 초안으로 보관할 수 있습니다. 저장 전에 채널과 글의 내용을 확인해 주세요.</p>
-            <button type="button" className="button secondary" disabled={!response.trim()} onClick={() => {
-              try {
-                if (project.documents[current] && !window.confirm('기존 문구를 이전 버전으로 보관하고 이 초안을 가져올까요?')) return;
-                update(importFreeformDraft(project, current, response)); setError(''); setNotice(`${channelNames[current]}에 원문을 검토용 초안으로 보관했습니다.`);
-                setResponse('');
-              } catch (cause) { setError(cause instanceof Error ? cause.message : '본문을 보관하지 못했어요.'); }
-            }}>현재 채널의 초안으로 보관</button></details></div>}
-      </section>
-      <aside className="card soft"><h2>문구의 사용 상태</h2>
-        <p>검토용 초안은 복사할 수 있지만 확인 상태가 함께 표시됩니다. 외부 AI가 적은 링크만으로 사실이 확인되지는 않습니다.</p>
-        <p className="small muted">여섯 채널 중 일부가 실패해도 작성한 채널은 남아 있습니다. 다른 AI 응답을 가져올 때는 기존 편집본을 먼저 백업해 주세요.</p>
-        <Link className="button secondary" href="/review">근거 다시 확인하기</Link>
-      </aside>
-    </div>
-    <div className="channel-picker" role="group" aria-label="결과물 종류">
-      {project.selectedChannels.map(c => <button key={c} type="button" className={c === current ? 'button' : 'button secondary'} onClick={() => router.replace(`/results?channel=${c}`, { scroll: false })} aria-pressed={c === current}>{channelNames[c]}{project.documents[c] ? ' ●' : ''}</button>)}
-    </div>
-    <div className="grid"><section className="card">
-      {project.previousDraft && <details><summary>예전 앱에서 가져온 초안 보기</summary><pre className="output">{project.previousDraft}</pre><p className="small muted">이전 초안입니다. 현재 확인된 문구나 근거로 간주하지 않습니다.</p></details>}
-      <h2>{channelNames[current]} {document && <span className={document.status === 'blocked' ? 'badge error' : document.status === 'ready' ? 'badge' : 'badge warn'}>
-        {document.status === 'ready' ? '현재 버전 확인' : document.status === 'blocked' ? '근거 보완 필요' : document.status === 'outline' ? '자료 보완용 구성안' : document.status === 'stale' ? '수정 후 다시 확인' : '검토용 초안'}
-      </span>}</h2>
-      {!document && <p className="muted">아직 이 채널의 문구가 없습니다. 작성 요청문으로 선택한 채널을 받아 주세요.</p>}
-      {document?.warnings.map(warning => <p key={warning} className="small muted">확인: {warning}</p>)}
-      {document?.blocks.map(block => <div className="document-block" key={block.id}>
-        <div className="field"><label htmlFor={`block-${block.id}`}>{block.kind === 'note' ? '작성 메모 (복사 본문에서 제외)' : block.kind === 'heading' ? '제목' : block.kind === 'cta' ? '행동 안내' : '본문'}</label>
-          <textarea id={`block-${block.id}`} value={edits[block.id] ?? block.text} onChange={e => setEdits(old => ({ ...old, [block.id]: e.target.value }))} onBlur={() => edit(block.id)} />
-        </div>
-        {!!block.claimRefs.length && <div className="small muted">연결된 근거: {block.claimRefs.map(id => project.claims.find(claim => claim.id === id)?.statement || '근거를 찾지 못함').join(' · ')}</div>}
-        {block.kind !== 'note' && <div className="small"><p>{block.claimRefs.length
-          ? '원문과 이 문장의 의미·대상·조건이 맞는지 직접 확인해 주세요. 원문 링크와 인용문은 오른쪽에 있습니다.'
-          : '이 문장에 사실·효능·경쟁 우위·실제 경험이 없는지 확인해 주세요.'}</p>
-          {document.reviewedBlocks[block.id] && <p className="muted">이 버전의 문장 확인 기록이 있습니다. 수정하면 다시 확인해야 합니다.</p>}
-          <button type="button" className="button secondary" disabled={edits[block.id] !== undefined} onClick={() => {
-            try { update(reviewBlock(project, current, block.id)); setError(''); setNotice('이 문장에 대한 확인을 기록했습니다.'); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : '문장을 확인하지 못했어요.'); }
-          }}>이 문장 확인했어요</button>
-        </div>}
-      </div>)}
-      {!!project.documentHistory[current]?.length && <details><summary>이전 버전 {project.documentHistory[current]?.length}개 보기</summary>
-        {project.documentHistory[current]?.slice(-10).reverse().map(old => <div className="document-block" key={`${old.id}-${old.revision}`}>
-          <strong>버전 {old.revision}</strong><pre className="output">{serializeDocument(old)}</pre>
-          <button className="button secondary" type="button" onClick={() => {
-            try { update(restoreDocumentVersion(project, current, old.id, old.revision)); setEdits({}); setNotice('이전 본문을 새 버전으로 가져왔습니다. 근거와 표현을 다시 확인해 주세요.'); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : '이전 버전을 복원하지 못했어요.'); }
-          }}>이 본문 다시 사용하기</button>
-        </div>)}</details>}
-      {document && <div className="row"><button type="button" className="button secondary" onClick={approve}>모든 문장 확인 완료</button>
-        <p className="small muted">바꾸면 이 채널의 이전 확인 상태가 취소됩니다.</p></div>}
-    </section>
-    <aside className="card"><h2>본문과 근거</h2>
-      {visibleDocument ? <><details open><summary>복사할 본문 보기</summary><pre className="output">{downloadableText(project, visibleDocument)}</pre></details>
-        <details><summary>출처 포함 본문 보기</summary><pre className="output">{serializeWithSources(project, visibleDocument)}</pre></details>
-        {document.blocks.flatMap(b => b.claimRefs).filter((id, index, all) => all.indexOf(id) === index).map(id => {
-          const claim = project.claims.find(c => c.id === id);
-          const source = project.sources.find(s => s.id === claim?.sourceId);
-          return claim && <div className="document-block small" key={id}><strong>{claim.statement}</strong><br />
-            <blockquote>{claim.quote || '원문 구간 없음'}</blockquote>
-            {source ? <>{source.title} · {source.origin === 'fetched' ? '본문 수집' : '사용자 원문 확인'}{source.url && <> · <a href={source.url} rel="noreferrer" target="_blank" className="source-link">원문 링크</a></>}</> : '출처 없음'}
-          </div>;
-        })}
-      </> : <p className="muted">문구를 만들면 사용한 근거와 적용 조건을 여기에서 확인할 수 있습니다.</p>}
-    </aside></div>
-    {document && <div className="sticky-actions">
-      <button type="button" className="button" onClick={() => void copy(false)}>본문 복사</button>
-      <button type="button" className="button secondary" onClick={() => void copy(true)}>출처 포함 복사</button>
-      <button type="button" className="button secondary" onClick={() => visibleDocument && downloadBlob(`${channelNames[current]}.txt`, new Blob([downloadableText(project, visibleDocument, true)], { type: 'text/plain;charset=utf-8' }))}>이 문서 받기</button>
-      <button type="button" className="button secondary" onClick={() => visibleDocument && downloadBlob(`${channelNames[current]}.md`, new Blob([`${visibleDocument.status === 'ready' ? '' : '> 검토용 초안 — 근거와 표현을 확인해 주세요.\n\n'}${serializeMarkdown(visibleDocument)}\n`], { type: 'text/markdown;charset=utf-8' }))}>마크다운 받기</button>
-      <button type="button" className="button secondary" onClick={() => void downloadZip(currentProject).catch(cause => setError(cause instanceof Error ? cause.message : '파일을 만들지 못했어요.'))}>전체 파일 받기</button>
+    {project.migrationNote && <details className="notice-details"><summary>가져온 응답에서 확인할 사항</summary><p className="small muted">{project.migrationNote}</p></details>}
+    {!hasDocuments && <section className="card"><span className="eyebrow">두 번째 요청 · 작성</span><h2>확인한 근거로 채널별 문구를 만듭니다.</h2>
+      {!project.claims.some(c => c.status === 'supported') && <p className="small muted">확인된 사실이 아직 없습니다. 기능·수치 없는 자료 보완용 구성안을 받을 수 있습니다.</p>}
+      <ManualExchange project={project} stage="content" update={update} onError={setError} onNotice={setNotice} />
+    </section>}
+    <div className={styles.channels} role="group" aria-label="결과물 종류">{project.selectedChannels.map(c => <button key={c} type="button" onClick={() => selectChannel(c)} aria-pressed={c === current}>{channelNames[c]}<span>{project.documents[c] ? '작성됨' : '미작성'}</span></button>)}</div>
+    <div className={`${styles.mobileChannel} field`}><label htmlFor="result-channel">보고 싶은 결과물</label><select id="result-channel" value={current} onChange={e => selectChannel(e.target.value as Channel)}>{project.selectedChannels.map(c => <option value={c} key={c}>{channelNames[c]} · {project.documents[c] ? '작성됨' : '미작성'}</option>)}</select></div>
+    {proposal && <section className={styles.proposal}><h2>다시 쓴 문구가 도착했습니다.</h2><p className="small">기존 수정본은 그대로 있습니다. 내용을 비교한 뒤 새 문구를 적용하세요.</p>
+      <details><summary>기존 문구와 새 제안 비교하기</summary><div className="grid"><div><h3>기존 문구</h3><pre className="output">{document ? serializeDocument(document) : '없음'}</pre></div><div><h3>새 제안</h3><pre className="output">{serializeDocument(proposal)}</pre></div></div></details>
+      {proposal.baseRevision !== document?.revision && <p className="small">요청한 뒤 기존 문구를 수정했습니다. 수정한 부분이 새 제안에도 반영됐는지 확인해 주세요.</p>}
+      <div className="row"><button className="button" type="button" onClick={() => act(() => {
+        const changed = proposal.baseRevision !== document?.revision;
+        if (changed && !window.confirm('수정한 기존 문구는 이전 버전에 보관합니다. 새 제안을 적용할까요?')) return;
+        update(applyDocumentProposal(project, current, changed));
+      }, '새 제안을 적용하고 기존 문구는 이전 버전에 보관했습니다.')}>새 문구 적용하기</button>
+      <button className="button secondary" type="button" onClick={() => { const next = { ...project.documentProposals }; delete next[current]; update({ ...project, documentProposals: next }); setNotice('기존 문구를 유지합니다.'); }}>기존 문구 유지하기</button></div>
+    </section>}
+    {document && <div className={styles.toolbar}>
+      <button className="button" type="button" onClick={() => void copy(false)}>{document.status === 'ready' ? '최종본 복사' : '검토용 초안 복사'}</button>
+      <button className="button secondary" type="button" onClick={() => void copy(true)}>출처 포함 복사</button>
+      <details className={styles.download}><summary>파일 받기</summary><div>
+        <button className="button text" type="button" onClick={() => act(() => { if (!serializeDocument(document)) throw new Error('받을 본문이 없습니다.'); downloadBlob(`${channelNames[current]}.txt`, new Blob([downloadableText(project, document, true)], { type: 'text/plain;charset=utf-8' })); })}>이 문서 받기</button>
+        <button className="button text" type="button" onClick={() => act(() => { if (!serializeDocument(document)) throw new Error('받을 본문이 없습니다.'); downloadBlob(`${channelNames[current]}.md`, new Blob([downloadableMarkdown(project, document)], { type: 'text/markdown;charset=utf-8' })); })}>마크다운 받기</button>
+        <button className="button text" type="button" onClick={() => void downloadZip(project).catch(cause => setError(cause instanceof Error ? cause.message : '파일을 만들지 못했어요.'))}>전체 파일 받기</button>
+      </div></details>
     </div>}
-    {document && !serializeDocument(document) && <p className="alert">빈 문서는 복사·다운로드할 수 없습니다.</p>}
+    {copyFallback && <div className="field"><label htmlFor="copy-fallback">직접 복사할 본문</label><textarea id="copy-fallback" readOnly value={copyFallback} onFocus={e => e.target.select()} /></div>}
+    <div className={styles.workspace}><section className={styles.editor} aria-label="문구 편집">
+      <div className={styles.editorTitle}><h2>{channelNames[current]}</h2>{document && <span data-testid="publication-status" className={document.status === 'blocked' ? 'badge error' : document.status === 'ready' ? 'badge' : 'badge warn'}>{statusNames[document.status]}</span>}</div>
+      {!document && <p className="muted">아직 이 채널의 문구가 없습니다. 응답에 없던 채널은 다른 내용으로 채우지 않습니다.</p>}
+      {document?.blocks.map(block => <div key={block.id} className={styles.block} data-kind={block.kind} onFocus={() => setActiveBlock(block.id)}>
+        <div className={styles.blockLabel}><label htmlFor={`block-${block.id}`}>{blockNames[block.kind]}</label><button type="button" className="button text" aria-label={`${blockNames[block.kind]} 문단 삭제`} onClick={() => act(() => update(editDocument(project, current, document.blocks.filter(b => b.id !== block.id))))}>삭제</button></div>
+        <textarea id={`block-${block.id}`} value={block.text} maxLength={25000} onChange={e => act(() => update(updateDocumentText(project, current, block.id, e.target.value)))} />
+        {block.kind !== 'note' && <>
+          <small>{block.claimRefs.length ? `연결된 근거 ${block.claimRefs.length}개 · 의미와 조건을 원문과 대조해 주세요.` : '객관적 사실을 말하는 문장이라면 아래에서 근거를 연결해 주세요.'}</small>
+          <details><summary className="small">근거 연결·적용 조건</summary>{project.claims.length ? project.claims.map(claim => <label className="row small" key={claim.id}><input type="checkbox" checked={block.claimRefs.includes(claim.id)} onChange={e => act(() => update(editDocument(project, current, document.blocks.map(b => b.id === block.id ? { ...b, claimRefs: e.target.checked ? [...b.claimRefs, claim.id] : b.claimRefs.filter(id => id !== claim.id) } : b))))} /><span>{claim.statement} · {claim.status === 'supported' ? '원문 대조함' : '미확인'}{claim.conditions ? ` / 조건: ${claim.conditions}` : ''}</span></label>) : <p className="small muted">연결할 주장이 없습니다. 분석 화면에서 원문을 먼저 확인해 주세요.</p>}</details>
+          {document.reviewedBlocks[block.id] ? <p className="small muted">이 버전의 문장을 직접 확인했습니다.</p> : <button type="button" className="button secondary" onClick={() => act(() => update(reviewBlock(project, current, block.id)), '이 문장에 대한 확인을 기록했습니다.')}>{block.claimRefs.length ? '원문과 문구를 대조했어요' : '사실 주장 없는 문장임을 확인했어요'}</button>}
+        </>}
+      </div>)}
+      {document && <>
+        <div className="row"><button className="button text" type="button" onClick={() => act(() => update(editDocument(project, current, [...document.blocks, { id: crypto.randomUUID(), kind: 'paragraph', text: '', claimRefs: [] }]))) }>+ 문단 더하기</button>
+          <button className="button text" type="button" onClick={() => act(() => update(editDocument(project, current, [...document.blocks, { id: crypto.randomUUID(), kind: 'note', text: '', claimRefs: [] }]))) }>+ 작성 메모</button></div>
+        <div className={styles.review}><button className="button secondary" type="button" onClick={() => act(() => update(reviewDocument(project, current)), '현재 버전의 원문과 문구를 대조한 기록을 남겼습니다.')}>모든 문장 확인 완료</button><span className="small muted">직접 확인한 문장 {Object.keys(document.reviewedBlocks).length}/{publicBlocks.length}</span></div>
+        {!!project.documentHistory[current]?.length && <details><summary>이전 버전 {project.documentHistory[current]?.length}개 보기</summary>{project.documentHistory[current]?.slice(-10).reverse().map(old => <div className="document-block" key={`${old.id}-${old.revision}`}><strong className="small">버전 {old.revision}</strong><pre className="output">{serializeDocument(old)}</pre><button className="button secondary" type="button" onClick={() => act(() => update(restoreDocumentVersion(project, current, old.id, old.revision)), '이전 본문을 가져왔습니다. 현재 근거로 다시 확인해 주세요.')}>이 본문 다시 사용하기</button></div>)}</details>}
+      </>}
+      {project.previousDraft && <details><summary>예전 앱에서 가져온 초안 보기</summary><pre className="output">{project.previousDraft}</pre></details>}
+    </section>
+    <aside className={styles.evidence} aria-label="선택한 문구의 근거">
+      <section><h2>이 문구의 근거</h2><p className="muted">문단을 선택하면 연결한 원문과 확인할 사항을 보여드립니다.</p>
+        {refs.length ? refs.map(id => { const claim = project.claims.find(c => c.id === id); const source = project.sources.find(s => s.id === claim?.sourceId);
+          return <div className="document-block" key={id}><h3>{claim?.statement || '연결된 주장이 없습니다.'}</h3><blockquote>{claim?.quote || '원문 구간 없음'}</blockquote><p>{source?.title || '출처 없음'} · {source?.origin === 'fetched' ? '본문 수집' : source?.origin === 'direct_input' ? '사용자 제공 원문' : '원문 확인 필요'}</p>
+            {claim?.conditions && <p><strong>본문에 함께 쓸 조건</strong><br />{claim.conditions}</p>}{source?.url && <a className="source-link small" href={source.url} rel="noreferrer" target="_blank">원문 열기 ↗</a>}</div>;
+        }) : <p className="small muted">연결된 사실 주장이 없습니다. 감성 문구나 제안인지, 확인할 사실이 빠졌는지 살펴보세요.</p>}
+        {!!issues.length && <ul>{issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul>}
+        {document?.warnings.filter(w => !issues.some(i => i.message === w)).map(w => <p key={w} className="muted">{w}</p>)}
+        {document && <button className="button secondary" type="button" onClick={() => act(() => update(checkCurrentDocument(project, current)), '현재 근거로 기본 검사를 했습니다. 문장의 의미는 직접 확인해 주세요.')}>현재 근거로 다시 검사</button>}
+        <p className="small muted">자동 의미 검사: 미실행 · 원문 대조: 직접 확인</p>
+      </section>
+      {document && <details><summary>복사할 본문 미리 보기</summary><pre className="output" data-testid="serialized-document">{downloadableText(project, document, true)}</pre></details>}
+    </aside></div>
+    {hasDocuments && <details className={styles.exchange} open={!!project.manualContentRequestId}><summary>{document ? '이 채널 다시 작성하기' : '누락된 채널 작성하기'}</summary><ManualExchange project={project} stage="content" channels={[current]} update={update} onError={setError} onNotice={setNotice} /></details>}
   </>;
 }

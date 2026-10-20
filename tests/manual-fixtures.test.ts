@@ -30,7 +30,8 @@ describe('허구의 여섯 채널 기능 검수', () => {
     const written = importContent({ ...researched, manualContentRequestId: 'fixture-request' }, fixture('content.partial.json'));
     expect(written.documents.ad_copy).toBeDefined();
     expect(written.documents.blog).toBeUndefined();
-    expect(() => importContent(written, fixture('content.partial.json'))).toThrow();
+    expect(importContent(written, fixture('content.partial.json'))).toBe(written);
+    expect(written.documentHistory.ad_copy).toBeUndefined();
     const mixed = JSON.parse(fixture('content.partial.json'));
     mixed.documents.push({ channel: 'blog', blocks: [{ kind: 'paragraph', text: '출처 없는 새 수치 99%', claimRefs: ['missing'] }] });
     const partial = importContent({ ...researched, manualContentRequestId: 'fixture-request' }, JSON.stringify(mixed));

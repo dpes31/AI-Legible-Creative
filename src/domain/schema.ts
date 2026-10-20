@@ -14,6 +14,7 @@ const webUrl = z.url().refine(value => {
 }, 'http 또는 https 링크만 사용할 수 있습니다.');
 export const objectiveSchema = z.enum(['sales', 'feature', 'trust']);
 export type Objective = z.infer<typeof objectiveSchema>;
+export const objectiveNames: Record<Objective, string> = { sales: '구매·문의 늘리기', feature: '제품 특징 알리기', trust: '브랜드 신뢰 높이기' };
 export const sourceSchema = z.object({
   id, projectId: id, title: shortText, url: webUrl.nullable(),
   excerpt: z.string().max(50000), body: z.string().max(300000),
@@ -23,6 +24,9 @@ export const sourceSchema = z.object({
   publishedAt: z.string().nullable(), collectedAt: z.string().datetime(),
   externalAiAllowed: z.boolean(), publicationAllowed: z.boolean(),
   hash: id,
+  publisher: z.string().nullable().optional(),
+  fileName: z.string().optional(),
+  duplicateGroupId: z.string().optional(),
 });
 export type Source = z.infer<typeof sourceSchema>;
 export const claimSchema = z.object({
@@ -31,6 +35,8 @@ export const claimSchema = z.object({
   status: z.enum(['unreviewed', 'supported', 'contradicted', 'insufficient']),
   reviewedBy: z.enum(['human', 'model', 'deterministic']).nullable(),
   subject: z.string().max(300),
+  target: z.enum(['own', 'competitor', 'unresolved']).optional(),
+  review: z.object({ sourceHash: id, quote: z.string(), at: z.string().datetime(), method: z.enum(['human', 'model']) }).optional(),
 });
 export type Claim = z.infer<typeof claimSchema>;
 export const questionSchema = z.object({
@@ -43,6 +49,7 @@ export const comparisonSchema = z.object({
   otherClaimIds: z.array(id), comparable: z.boolean(),
   verdict: z.enum(['advantage', 'common', 'unknown', 'weakness']),
   reason: z.string().max(3000),
+  review: z.object({ conditions: shortText, asOf: z.string(), at: z.string().datetime(), evidenceRevision: z.number().int() }).optional(),
 });
 export type Comparison = z.infer<typeof comparisonSchema>;
 export const recommendationSchema = z.object({
@@ -62,6 +69,12 @@ export const documentSchema = z.object({
   validationHash: z.string().nullable(),
   status: z.enum(['ready', 'needs_review', 'blocked', 'stale', 'outline']),
   warnings: z.array(z.string()), updatedAt: z.string().datetime(),
+  inputRevision: z.number().int().optional(),
+  baseRevision: z.number().int().optional(),
+  validation: z.object({ hash: id, rulesVersion: id, checkedAt: z.string().datetime(),
+    semanticMethod: z.enum(['not_run', 'human', 'model']),
+    issues: z.array(z.object({ blockId: id, message: z.string(), severity: z.enum(['block', 'review']) })),
+  }).optional(),
 });
 export type ChannelDocument = z.infer<typeof documentSchema>;
 export const projectSchema = z.object({
@@ -77,6 +90,11 @@ export const projectSchema = z.object({
   comparisons: z.array(comparisonSchema), recommendations: z.array(recommendationSchema),
   documents: z.partialRecord(z.enum(channels), documentSchema),
   documentHistory: z.partialRecord(z.enum(channels), z.array(documentSchema)).default({}),
+  documentProposals: z.partialRecord(z.enum(channels), documentSchema).default({}),
+  manualDrafts: z.object({ research: z.string().max(500000), content: z.string().max(500000) }).default({ research: '', content: '' }),
+  contentRequestChannels: z.array(z.enum(channels)).default([]),
+  importReceipts: z.array(z.object({ requestId: id, contract: z.string(), responseHash: id, at: z.string().datetime() })).default([]),
+  missingEvidence: z.array(z.string()).default([]),
   manualResearchRequestId: z.string().nullable(), manualContentRequestId: z.string().nullable(),
   previousDraft: z.string().nullable(), migrationNote: z.string().nullable(),
   createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
@@ -111,6 +129,7 @@ export const researchImportSchema = z.object({
   sources: z.array(z.object({
     ref: id, title: shortText, url: webUrl.nullable(), excerpt: z.string().max(50000),
     sourceType: z.enum(['official', 'test', 'independent', 'review', 'user']).default('user'),
+    publisher: z.string().nullable().optional(), publishedAt: z.string().nullable().optional(),
   })),
   claims: z.array(z.object({
     ref: id, statement: shortText, sourceRef: id.nullable(), quote: z.string().max(10000),

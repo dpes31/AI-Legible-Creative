@@ -89,3 +89,9 @@ details summary { cursor:pointer; font-weight:650; padding:.5rem 0; }
   html { scroll-behavior:auto; }
   .button { transition:none; }
 }
+
+.notice-details { margin-bottom:20px; border-bottom:1px solid var(--line); }
+.notice-details summary { color:var(--muted); font-size:13px; }
+.manual-exchange { margin-top:16px; }
+.manual-exchange .field { margin-top:18px; }
+.exchange-prompt textarea { min-height:150px; font-size:14px; }

@@ -26,6 +26,12 @@ export function downloadableText(project: Project, document: ChannelDocument, so
   return state + (sources ? serializeWithSources(project, document) : serializeDocument(document));
 }
 
+export function downloadableMarkdown(project: Project, document: ChannelDocument) {
+  const state = document.status === 'ready' ? '' : '> 검토용 초안 — 근거와 표현을 확인해 주세요.\n\n';
+  const sourceText = serializeWithSources(project, document).slice(serializeDocument(document).length).trim();
+  return `${state}${serializeMarkdown(document)}${sourceText ? `\n\n${sourceText}` : ''}\n`;
+}
+
 export function downloadBlob(name: string, content: Blob) {
   const url = URL.createObjectURL(content);
   const link = document.createElement('a');
@@ -46,7 +52,7 @@ export async function buildZip(project: Project): Promise<Blob> {
       continue;
     }
     zip.file(`${channelNames[channel]}.txt`, downloadableText(project, doc, true)); count++;
-    zip.file(`${channelNames[channel]}.md`, `${doc.status === 'ready' ? '' : '> 검토용 초안 — 근거와 표현을 확인해 주세요.\n\n'}${serializeMarkdown(doc)}\n`);
+    zip.file(`${channelNames[channel]}.md`, downloadableMarkdown(project, doc));
     statusLines.push(`${channelNames[channel]}: ${doc.status === 'ready' ? '현재 버전 확인' : '검토용 초안, 공개 전 확인 필요'}`);
     for (const claimId of doc.blocks.flatMap(block => block.claimRefs)) {
       const sourceId = project.claims.find(claim => claim.id === claimId)?.sourceId;
