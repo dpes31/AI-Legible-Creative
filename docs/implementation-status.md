@@ -17,7 +17,7 @@
 | W6 품질 검수 | 진행 중 | lint/typecheck/test/build 성공. Playwright 브라우저 다운로드 실패, 실기기 미실행 |
 | W7 검수 제출 | 진행 중 | 로컬 실행 안내 작성. Preview·Draft PR 미작성 |
 
-최근 로컬 검증: `npm ci`, `npm run test` 19개 통과, `npm run lint`, `npm run typecheck`, `npm run build` 통과. `npm run test:e2e -- --project=chromium`은 실행했으나 브라우저 바이너리가 없어 2개 실패. `npx playwright install chromium`은 배포 CDN에서 압축 파일을 받지 못해 실패. Turbopack 캐시 오류 후 캐시를 별도 위치로 옮겨 빌드를 재실행해 통과. 실제 화면·실기기 통과로 계산하지 않음. `npm audit --omit=dev`: 운영 의존성 0건. 전체 개발 의존성 감사: 9건(중간 1, 높음 8), `concurrently` 제거로 critical 0건. 영향과 대체 버전 검토 없이 강제 업그레이드하지 않음.
+최근 로컬 검증: 구현 SHA `8b29c0314d4e8fd3564052426f022a643a1b1037`에서 `npm ci`, `npm run test` 19개 통과, `npm run lint`, `npm run typecheck`, `npm run build` 통과. 같은 셸의 로컬 서버에서 `/` HTML 응답과 `/api/capabilities` 미설정 503을 확인. `npm run test:e2e -- --project=chromium`은 실행했으나 브라우저 바이너리가 없어 2개 실패. `npx playwright install chromium`은 배포 CDN에서 압축 파일을 받지 못해 실패. Turbopack 캐시 오류 후 캐시를 별도 위치로 옮겨 빌드를 재실행해 통과. 실제 화면·실기기 통과로 계산하지 않음. `npm audit --omit=dev`: 운영 의존성 0건. 전체 개발 의존성 감사: 9건(중간 1, 높음 8), `concurrently` 제거로 critical 0건. 영향과 대체 버전 검토 없이 강제 업그레이드하지 않음.
 
 원격 제출 차단: `git push`는 GitHub 인증이 없어 실패했고, 연결된 GitHub 도구의 브랜치 생성·blob 쓰기는 각각 `Resource not accessible by integration`(403)으로 거절됨. 로컬 커밋은 유지. GitHub 앱에 해당 저장소의 Contents 쓰기 권한이 복구될 때까지 원격 브랜치·Draft PR·Preview를 제출했다고 주장하지 않음.
 
