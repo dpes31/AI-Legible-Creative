@@ -7,25 +7,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint src tests e2e playwright.config.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
-    "clsx": "^2.1.1",
     "idb": "^8.0.4",
     "jszip": "^3.10.2",
-    "lucide-react": "^1.8.0",
     "next": "^16.4.2",
     "openai": "^7.39.0",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwind-merge": "^3.5.0",
-    "zod": "^4.6.7",
-    "zustand": "^5.0.12"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
@@ -33,7 +29,6 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "concurrently": "^9.2.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.2",
     "fake-indexeddb": "^6.2.5",
