@@ -8,7 +8,7 @@ import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 
 export default function Home() {
   const router = useRouter();
-  const { project, loading, create } = useWorkspace();
+  const { project, loading, create, update } = useWorkspace();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'brand' | 'product' | 'service'>('product');
   const [description, setDescription] = useState('');
@@ -20,6 +20,15 @@ export default function Home() {
   const [mode, setMode] = useState<'manual' | 'automatic'>('manual');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [editing, setEditing] = useState(false);
+
+  const editCurrent = () => {
+    if (!project) return;
+    setName(project.name); setKind(project.kind); setDescription(project.description);
+    setObjective(project.objective); setAudience(project.audience); setAudienceUndecided(project.audienceUndecided);
+    setOfficialUrl(project.officialUrl); setSelectedChannels(project.selectedChannels); setMode(project.mode);
+    setEditing(true); setMessage('대상 자체를 바꾸면 자료가 섞이지 않도록 새 작업으로 만듭니다.');
+  };
 
   const toggle = (channel: Channel) => setSelectedChannels(current => current.includes(channel) ? current.filter(x => x !== channel) : [...current, channel]);
   const submit = async (event: FormEvent) => {
@@ -29,9 +38,23 @@ export default function Home() {
     }
     setPending(true); setMessage('');
     try {
-      const next = newProject({ name: name.trim(), kind, description: description.trim(), officialUrl: officialUrl.trim(),
-        objective, audience: audience.trim(), audienceUndecided, selectedChannels, mode });
-      await create(next); router.push('/review');
+      const input = { name: name.trim(), kind, description: description.trim(), officialUrl: officialUrl.trim(),
+        objective, audience: audience.trim(), audienceUndecided, selectedChannels, mode };
+      if (editing && project && project.name === input.name && project.kind === input.kind) {
+        const analyticalChange = project.objective !== input.objective || project.audience !== input.audience ||
+          project.audienceUndecided !== input.audienceUndecided || project.description !== input.description || project.officialUrl !== input.officialUrl;
+        update({ ...project, ...input, inputRevision: project.inputRevision + 1,
+          evidenceRevision: project.evidenceRevision + (analyticalChange ? 1 : 0),
+          manualResearchRequestId: null, manualContentRequestId: null,
+          questions: analyticalChange ? [] : project.questions,
+          comparisons: analyticalChange ? [] : project.comparisons,
+          recommendations: analyticalChange ? [] : project.recommendations,
+          documents: analyticalChange ? Object.fromEntries(Object.entries(project.documents).map(([key, doc]) =>
+            [key, doc && { ...doc, status: 'stale' }])) as typeof project.documents : project.documents });
+      } else {
+        await create(newProject(input));
+      }
+      setEditing(false); router.push('/review');
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : '작업을 만들지 못했어요.'); }
     finally { setPending(false); }
   };
@@ -43,10 +66,10 @@ export default function Home() {
     </section>
     {!loading && project && <div className="card soft row">
       <div style={{ flex: 1 }}><strong>진행 중인 작업: {project.name}</strong><p className="small muted">입력과 작성한 내용은 이 브라우저에 남아 있습니다.</p></div>
-      <Link className="button secondary" href="/review">이어서 분석하기</Link><Link className="button secondary" href="/results">결과 확인하기</Link>
+      <button className="button secondary" type="button" onClick={editCurrent}>입력 고치기</button><Link className="button secondary" href="/review">이어서 분석하기</Link><Link className="button secondary" href="/results">결과 확인하기</Link>
     </div>}
     <div className="grid"><form className="card" onSubmit={submit}>
-      <h2>새 작업 만들기</h2>
+      <h2>{editing ? '현재 작업의 입력 고치기' : '새 작업 만들기'}</h2>
       <div className="field"><label htmlFor="entity">무엇을 알리고 싶으신가요?</label>
         <input id="entity" value={name} onChange={event => setName(event.target.value)} placeholder="정확한 브랜드 또는 제품 이름" required /></div>
       <div className="field"><label htmlFor="kind">대상 구분</label><select id="kind" value={kind} onChange={event => setKind(event.target.value as typeof kind)}>
@@ -75,7 +98,7 @@ export default function Home() {
         {mode === 'automatic' && <p className="small muted">유료 호출은 현재 꺼져 있습니다. 입력 후 수동 방식으로 바꿔 계속할 수 있습니다.</p>}
       </fieldset>
       {message && <p role="alert" className="alert">{message}</p>}
-      <div className="sticky-actions"><button className="button" type="submit" disabled={pending}>{pending ? '저장 중…' : '브랜드 분석 시작'}</button></div>
+      <div className="sticky-actions"><button className="button" type="submit" disabled={pending}>{pending ? '저장 중…' : editing ? '바뀐 입력 저장하기' : '브랜드 분석 시작'}</button></div>
     </form>
     <aside className="card soft"><h2>이렇게 진행됩니다</h2><ol className="list">
       <li><strong>정보 입력</strong> — 이름, 목적, 고객 상황만 먼저 적습니다.</li>

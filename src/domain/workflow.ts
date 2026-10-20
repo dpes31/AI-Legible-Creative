@@ -5,9 +5,39 @@ import {
 
 export class ImportError extends Error {}
 
+function markdownResponse(cleaned: string): unknown {
+  const lines = cleaned.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const contract = lines[0]?.replace(/^#\s*/, '');
+  if (contract !== 'alc.research.v1' && contract !== 'alc.content.v1') throw new ImportError('응답에서 필요한 항목을 찾지 못했어요. 원문은 남아 있습니다.');
+  const requestId = lines.find(line => /^requestId\s*:/i.test(line))?.split(':').slice(1).join(':').trim();
+  if (!requestId) throw new ImportError('응답의 요청 ID를 찾지 못했어요.');
+  const sections = new Map<string, string[]>();
+  let section = '';
+  for (const line of lines.slice(1)) {
+    if (line.startsWith('## ')) { section = line.slice(3).trim(); sections.set(section, []); }
+    else if (line.startsWith('- ') && section) sections.get(section)?.push(line.slice(2));
+  }
+  const rows = (key: string) => (sections.get(key) || []).map(line => line.split(' | ').map(s => s.trim()));
+  if (contract === 'alc.content.v1') {
+    const documents = channels.flatMap(channel => sections.has(channel) ? [{ channel,
+      blocks: rows(channel).map(([kind, body, refs = '']) => ({ kind, text: body, claimRefs: refs ? refs.split(',').map(s => s.trim()) : [] })),
+    }] : []);
+    return { contract, requestId, documents, unresolvedItems: (sections.get('unresolvedItems') || []) };
+  }
+  const entity = lines.find(line => /^entity\s*:/i.test(line))?.split(':').slice(1).join(':').trim();
+  if (!entity) throw new ImportError('응답의 대상 이름을 찾지 못했어요.');
+  return { contract, requestId, entity: { name: entity },
+    sources: rows('sources').map(([ref, title, url = '', excerpt = '']) => ({ ref, title, url: url || null, excerpt, sourceType: 'user' })),
+    claims: rows('claims').map(([ref, statement, sourceRef = '', quote = '']) => ({ ref, statement, sourceRef: sourceRef || null, quote, conditions: '', subject: entity })),
+    questions: rows('questions').map(([ref, question]) => ({ ref, text: question, provenance: 'hypothesis', sourceRefs: [] })),
+    comparisons: [], recommendations: [], missingEvidence: (sections.get('missingEvidence') || []),
+  };
+}
+
 function parseResponse(text: string): unknown {
   const cleaned = text.replace(/^\uFEFF/, '').trim();
   const fenced = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (cleaned.startsWith('# alc.')) return markdownResponse(cleaned);
   try { return JSON.parse(fenced ? fenced[1] : cleaned); }
   catch { throw new ImportError('응답 형식을 읽지 못했어요. 요청문을 다시 보내거나 원문을 보관한 뒤 직접 수정해 주세요.'); }
 }
@@ -36,6 +66,7 @@ export function prepareResearch(project: Project): { project: Project; prompt: s
       'comparisons 각 항목: {"ref":"K1","competitor":"대상","criterion":"비교 기준","ownClaimRefs":["C1"],"otherClaimRefs":[],"comparable":false,"verdict":"unknown","reason":"비교 자료 부족"}.',
       'recommendations 각 항목: {"ref":"R1","situation":"고객 상황","reason":"선택 이유","claimRefs":["C1"],"comparisonRefs":["K1"],"limitation":"적용되지 않는 경우"}.',
       '근거가 없으면 배열을 비워 두고 missingEvidence에 필요한 자료를 적으세요. 조사 결과의 verified/confidence 표시는 검증 완료가 아닙니다.',
+      'JSON을 만들 수 없는 경우만 정확한 Markdown 형식으로 보내세요: # alc.research.v1 / requestId: 위 ID / entity: 대상명 / ## sources 아래 - S1 | 자료명 | URL 또는 빈칸 | 실제 원문 / ## claims 아래 - C1 | 주장 | S1 | 실제 인용 / ## questions 아래 - Q1 | 질문 / ## missingEvidence 아래 - 필요한 자료. 각 항목은 새 줄입니다.',
     ].join('\n\n'),
   };
 }
@@ -84,7 +115,9 @@ export function importResearch(project: Project, response: string): Project {
     id: requireRef(comparisonIds, x.ref), competitor: x.competitor, criterion: x.criterion,
     ownClaimIds: x.ownClaimRefs.map(ref => requireRef(claimIds, ref)),
     otherClaimIds: x.otherClaimRefs.map(ref => requireRef(claimIds, ref)),
-    comparable: x.comparable, verdict: x.verdict, reason: x.reason,
+    // An external response cannot certify matching models, dates or test conditions.
+    comparable: false, verdict: 'unknown' as const,
+    reason: `${x.reason} (외부 조사 제안: 양쪽 원문·모델·조건 확인 전)`,
   }));
   const recommendations = data.recommendations.map(x => ({
     id: crypto.randomUUID(), situation: x.situation, reason: x.reason,
@@ -148,9 +181,11 @@ export function prepareContent(project: Project): { project: Project; prompt: st
       `사용 가능한 주장과 조건: ${approved.map(c => `[${c.id}] ${c.statement}${c.conditions ? ` (조건: ${c.conditions})` : ''}`).join('\n') || '확인된 사실 없음. 사실을 추가하지 말고 자료 보완용 구성안만 작성하세요.'}`,
       `고객 선택 이유(자료 확인 상태를 유지): ${project.recommendations.map(r => `${r.reason} / 한계: ${r.limitation}`).join('; ') || '확인할 자료 없음'}`,
       '광고카피·상세페이지·보도자료·유튜브 설명·블로그·후기 영상 핵심 문구는 서로 다른 역할의 문서로 작성하세요.',
+      '광고카피: 헤드라인·보조 문구·행동 유도 3안. 상세페이지: 첫 화면·선택 이유·사용 조건·FAQ. 보도자료: 확인된 발표 내용만 첫 문단과 본문에. 유튜브: 제목 후보·첫 문단·공식 링크. 블로그: 고객 질문에 바로 답하고 상황별 선택 기준. 후기 영상: 실제 발언이 없다면 인터뷰 질문과 촬영 장면만.',
       '영상·대본이 없으면 유튜브는 제작 전 초안, 실제 후기·녹취가 없으면 후기는 촬영 가이드, 발표 정보가 없으면 보도자료는 발표 전 초안으로 표시하세요.',
       'JSON만 반환하세요. 형식: {"contract":"alc.content.v1","requestId":"위 ID","documents":[{"channel":"ad_copy","blocks":[{"kind":"heading|paragraph|bullet|cta|note","text":"문장","claimRefs":["실제 허용된 주장 ID"]}]}],"unresolvedItems":[]}.',
       '선택 채널만 각각 한 번씩 반환하고, 빈 채널은 그대로 누락하며 unresolvedItems에 이유를 적으세요. 사실 주장은 해당 claimRefs와 조건을 본문에 포함하세요. 새 사실을 만들지 마세요.',
+      'JSON이 불가능한 경우만 정확한 Markdown 형식으로 보내세요: # alc.content.v1 / requestId: 위 ID / ## ad_copy 등 채널 ID 아래 - heading | 제목 | 또는 - paragraph | 본문 | 허용 주장 ID. 나머지 채널도 각각 ## 채널 ID로 구분하세요.',
     ].join('\n\n'),
   };
 }
