@@ -75,7 +75,7 @@ export default function ReviewPage() {
   };
 
   return <>
-    <section className="hero"><div className="eyebrow">2. 분석 확인</div><h1>{project.name}을 선택할 이유는 무엇인가요?</h1>
+    <section className="hero"><div className="eyebrow">2. 분석 확인</div><h1>브랜드 분석: {project.name}</h1>
       <p className="muted">광고 목적과 고객 상황에 맞춰 경쟁 제품과 비교할 근거를 확인합니다. 찾지 못한 자료를 ‘없는 기능’으로 단정하지 않습니다.</p></section>
     {project.migrationNote && <p className="alert" role="status">{project.migrationNote}</p>}
     {error && <p className="alert" role="alert">{error}</p>}

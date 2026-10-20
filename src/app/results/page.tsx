@@ -1,15 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { channelNames, type Channel } from '@/domain/schema';
 import { editDocument, importContent, importFreeformDraft, prepareContent, restoreDocumentVersion, reviewBlock, reviewDocument } from '@/domain/workflow';
 import { downloadBlob, downloadableText, downloadZip, serializeDocument, serializeMarkdown, serializeWithSources } from '@/lib/export';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 
 export default function ResultsPage() {
+  return <Suspense fallback={<p role="status">문구를 불러오는 중입니다…</p>}><ResultsWorkspace /></Suspense>;
+}
+
+function ResultsWorkspace() {
   const { project, loading, update } = useWorkspace();
-  const [channel, setChannel] = useState<Channel>('ad_copy');
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [prompt, setPrompt] = useState('');
   const [promptId, setPromptId] = useState<string | null>(null);
   const [response, setResponse] = useState('');
@@ -20,7 +26,7 @@ export default function ResultsPage() {
   if (loading) return <p role="status">문구를 불러오는 중입니다…</p>;
   if (!project) return <div className="card"><h1>먼저 알릴 대상을 정해 주세요.</h1><Link className="button" href="/">정보 입력하기</Link></div>;
 
-  const current: Channel = project.selectedChannels.includes(channel) ? channel : project.selectedChannels[0];
+  const current: Channel = project.selectedChannels.find(item => item === searchParams.get('channel')) ?? project.selectedChannels[0];
   const document = project.documents[current];
   const visibleDocument = document && { ...document, blocks: document.blocks.map(block =>
     edits[block.id] === undefined ? block : { ...block, text: edits[block.id] }),
@@ -89,7 +95,7 @@ export default function ResultsPage() {
       </aside>
     </div>
     <div className="channel-picker" role="group" aria-label="결과물 종류">
-      {project.selectedChannels.map(c => <button key={c} type="button" className={c === current ? 'button' : 'button secondary'} onClick={() => setChannel(c)} aria-pressed={c === current}>{channelNames[c]}{project.documents[c] ? ' ●' : ''}</button>)}
+      {project.selectedChannels.map(c => <button key={c} type="button" className={c === current ? 'button' : 'button secondary'} onClick={() => router.replace(`/results?channel=${c}`, { scroll: false })} aria-pressed={c === current}>{channelNames[c]}{project.documents[c] ? ' ●' : ''}</button>)}
     </div>
     <div className="grid"><section className="card">
       {project.previousDraft && <details><summary>예전 앱에서 가져온 초안 보기</summary><pre className="output">{project.previousDraft}</pre><p className="small muted">이전 초안입니다. 현재 확인된 문구나 근거로 간주하지 않습니다.</p></details>}

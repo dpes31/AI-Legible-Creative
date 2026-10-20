@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ko"><body>
+  return <html lang="ko" data-scroll-behavior="smooth"><body>
     <WorkspaceProvider><Header /><main id="main-content" tabIndex={-1} className="container page-main">{children}</main></WorkspaceProvider>
   </body></html>;
 }

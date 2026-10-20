@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 
-test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 연다', async ({ page }) => {
+test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 연다', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.getByLabel('무엇을 알리고 싶으신가요?').fill('가상 브랜드 솔담 보온컵');
   await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
-  await expect(page.getByRole('heading', { name: /솔담 보온컵을 선택할 이유/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '브랜드 분석: 가상 브랜드 솔담 보온컵' })).toBeVisible();
   await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
   const request = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
   const researchId = request.match(/요청 ID: ([\w-]+)/)?.[1];
@@ -16,6 +16,7 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
   await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
   await expect(page.getByText('뚜껑을 돌려 닫는 구조', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('research-fictional-fixture.png'), fullPage: true });
   await page.getByRole('link', { name: '근거 확인 후 문구 만들기' }).click();
   await page.getByRole('button', { name: '채널별 작성 요청문 만들기' }).click();
   const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
@@ -25,17 +26,33 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   content.requestId = contentId;
   await page.getByLabel('AI에서 받은 작성 결과 붙여넣기').fill(JSON.stringify(content));
   await page.getByRole('button', { name: '채널별 문구 가져오기' }).click();
-  await expect(page.getByText('닫는 방식부터 살펴보세요')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '제목', exact: true })).toHaveValue('닫는 방식부터 살펴보세요');
+  await page.screenshot({ path: testInfo.outputPath('results-fictional-fixture.png'), fullPage: true });
   await page.getByRole('button', { name: /후기 영상 핵심 문구/ }).click();
-  await expect(page.getByText('후기 촬영 가이드')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '제목', exact: true })).toHaveValue('후기 촬영 가이드');
+  await expect(page.getByRole('status').filter({ hasText: '이 브라우저에 저장됨' })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('후기 촬영 가이드')).toBeVisible();
+  await expect(page.getByRole('button', { name: /후기 영상 핵심 문구/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('textbox', { name: '제목', exact: true })).toHaveValue('후기 촬영 가이드');
   await expect(page.getByText('검토용 초안', { exact: true }).first()).toBeVisible();
 });
 
-test('320px 화면에서 새 프로젝트 입력의 가로 넘침이 없다', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 720 });
-  await page.goto('/');
-  await expect(page.getByLabel('무엇을 알리고 싶으신가요?')).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+test('320~1440px 입력과 모드 변경에서 내용·선택을 보존한다', async ({ page }, testInfo) => {
+  test.setTimeout(60000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [320, 375, 390, 768, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    const name = page.getByLabel('무엇을 알리고 싶으신가요?');
+    await expect(name).toBeVisible();
+    await name.fill('이름이 아주 긴 가상 브랜드 보온컵');
+    await page.getByLabel('앱에서 자동으로', { exact: false }).check();
+    await expect(name).toHaveValue('이름이 아주 긴 가상 브랜드 보온컵');
+    await expect(page.getByText('아직 자동 실행을 연결하지 않았습니다.', { exact: false })).toBeVisible();
+    await page.getByLabel('외부 AI로 직접', { exact: false }).check();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    const size = await page.getByRole('button', { name: '브랜드 분석 시작' }).boundingBox();
+    expect(size?.height).toBeGreaterThanOrEqual(44);
+    await page.screenshot({ path: testInfo.outputPath(`brief-${width}.png`), fullPage: true });
+  }
 });
