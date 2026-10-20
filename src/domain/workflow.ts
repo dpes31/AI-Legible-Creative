@@ -3,6 +3,7 @@ import {
   type ChannelDocument, type Claim, type Project, type ResearchImport, type Source,
 } from './schema';
 import { z } from 'zod';
+import { assessRecommendation } from './analysis/recommendations';
 
 export class ImportError extends Error {}
 
@@ -178,10 +179,7 @@ export function prepareContent(project: Project): { project: Project; prompt: st
   const requestId = project.manualContentRequestId || crypto.randomUUID();
   const approved = project.claims.filter(c => c.status === 'supported' && project.sources.some(s =>
     s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed));
-  const allowedIds = new Set(approved.map(claim => claim.id));
-  const supportedReasons = project.recommendations.filter(reason => reason.claimIds.length > 0 &&
-    reason.claimIds.every(id => allowedIds.has(id)) &&
-    reason.comparisonIds.every(id => project.comparisons.some(c => c.id === id && c.comparable && c.verdict !== 'unknown')));
+  const supportedReasons = project.recommendations.filter(reason => assessRecommendation(project, reason).usable);
   const channelList = project.selectedChannels.map(channel => `${channel}(${channelNames[channel]})`).join(', ');
   return {
     project: { ...project, manualContentRequestId: requestId },

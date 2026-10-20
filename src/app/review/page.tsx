@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 import { attachOriginalText, fingerprint, importResearch, prepareResearch, verifyClaim } from '@/domain/workflow';
 import { type Project, type Source } from '@/domain/schema';
+import { assessRecommendation } from '@/domain/analysis/recommendations';
 import { readEvidenceFile } from '@/features/review/readFile';
 
 function markStale(project: Project) {
@@ -126,10 +127,10 @@ export default function ReviewPage() {
     <div className="grid">
       <section className="card"><h2>고객이 궁금해하는 것</h2>{project.questions.length ? <ul className="list">{project.questions.map(q => <li key={q.id}>{q.text} <span className="badge">{q.provenance === 'observed' ? '관찰' : q.provenance === 'reconstructed' ? '자료로 재구성' : '가설'}</span></li>)}</ul> : <p className="muted">조사한 질문이 없습니다. 고객 상황을 임의의 검색량으로 포장하지 않습니다.</p>}</section>
       <section className="card"><h2>경쟁 제품과 선택 이유</h2>{project.comparisons.map(c => <p key={c.id}><strong>{c.competitor}</strong> · {c.criterion}<br /><span className="small muted">{c.comparable ? c.reason : '같은 조건으로 확인하지 못했습니다. ' + c.reason}</span></p>)}
-        {project.recommendations.map(r => <div key={r.id} className="document-block"><strong>{r.situation}</strong>
-          <span className="badge warn">외부 조사에서 제안한 선택 이유</span><p>{r.reason}</p>
-          <p className="small muted">{r.claimIds.length && r.claimIds.every(id => project.claims.find(c => c.id === id)?.status === 'supported') ? '연결된 자사 주장의 원문은 직접 대조했습니다. 고객 적합성과 비교 조건은 별도 검토가 필요합니다.' : '연결된 주장 또는 고객 적합성을 아직 확인하지 않았습니다.'}</p>
-          <p className="small muted">한계: {r.limitation || '자료로 확인할 내용이 남아 있습니다.'}</p></div>)}
+        {project.recommendations.map(r => { const assessment = assessRecommendation(project, r); return <div key={r.id} className="document-block"><strong>{r.situation}</strong>
+          <span className={assessment.usable ? 'badge' : 'badge warn'}>{assessment.label}</span><p>{r.reason}</p>
+          <p className="small muted">{assessment.reason}</p>
+          <p className="small muted">한계: {r.limitation || '자료로 확인할 내용이 남아 있습니다.'}</p></div>; })}
         {!project.comparisons.length && !project.recommendations.length && <p className="muted">비교할 자료를 아직 찾지 못했습니다. 자사 특징을 경쟁 우위로 단정하지 않습니다.</p>}</section>
     </div>
     <div className="sticky-actions"><Link href="/results" className="button">근거 확인 후 문구 만들기</Link></div>

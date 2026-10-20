@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { convertLegacy } from '../src/data/legacy';
 import { attachOriginalText, editDocument, importContent, importResearch, prepareContent, prepareResearch, reviewBlock, reviewDocument, validateDocument, verifyClaim } from '../src/domain/workflow';
 import { assertProjectRelations, newProject, projectSchema, type ChannelDocument } from '../src/domain/schema';
+import { assessRecommendation } from '../src/domain/analysis/recommendations';
 
 function project() {
   return newProject({
@@ -133,6 +134,10 @@ describe('사실과 프로젝트의 무결성', () => {
     expect(prepareContent(p).prompt).not.toContain('내부에서만 확인한 특징');
     p.sources[0].externalAiAllowed = true;
     expect(prepareContent(p).prompt).toContain('내부에서만 확인한 특징');
+    p.recommendations = [{ id: 'r', situation: '특징 선택', reason: '경쟁 제품보다 더 좋습니다',
+      claimIds: ['private-claim'], comparisonIds: [], limitation: '' }];
+    expect(assessRecommendation(p, p.recommendations[0]).label).toBe('경쟁 우위 보류');
+    expect(prepareContent(p).prompt).not.toContain('경쟁 제품보다 더 좋습니다');
   });
 
   it('구버전 승인 상태를 이어받지 않고 끊어진 질문 관계를 알린다', () => {
