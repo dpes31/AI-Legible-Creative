@@ -19,6 +19,7 @@ export default function ReviewPage() {
   const [publicUse, setPublicUse] = useState(false);
   const [externalUse, setExternalUse] = useState(false);
   const [researchPrompt, setResearchPrompt] = useState('');
+  const [researchPromptId, setResearchPromptId] = useState<string | null>(null);
   const [response, setResponse] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -41,8 +42,9 @@ export default function ReviewPage() {
         publicationAllowed: publicUse, hash: fingerprint(body.trim()),
       };
       update({ ...project, sources: [...project.sources, source], evidenceRevision: project.evidenceRevision + 1,
+        manualResearchRequestId: null, manualContentRequestId: null,
         documents: markStale(project) });
-      setTitle(''); setBody(''); setUrl(''); setExternalUse(false); setPublicUse(false); setError(''); setNotice('자료를 저장했습니다. 사실과 출처가 맞는지 확인해 주세요.');
+      setResearchPrompt(''); setTitle(''); setBody(''); setUrl(''); setExternalUse(false); setPublicUse(false); setError(''); setNotice('자료를 저장했습니다. 이전 조사 요청문은 무효가 되었습니다. 사실과 출처를 확인해 주세요.');
     } catch { setError('링크를 정확한 https:// 또는 http:// 주소로 입력해 주세요.'); }
   };
 
@@ -58,7 +60,7 @@ export default function ReviewPage() {
   };
 
   const createPrompt = () => {
-    try { const prepared = prepareResearch(project); update(prepared.project); setResearchPrompt(prepared.prompt); setError(''); }
+    try { const prepared = prepareResearch(project); update(prepared.project); setResearchPrompt(prepared.prompt); setResearchPromptId(prepared.project.manualResearchRequestId); setError(''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '요청문을 만들지 못했어요.'); }
   };
   const pasteResearch = () => {
@@ -98,7 +100,7 @@ export default function ReviewPage() {
       <section className="card"><h2>외부 AI로 조사하기</h2><p>자사 사실·고객 질문·경쟁 제품·부족한 자료를 한 번에 요청합니다.</p>
         {project.mode === 'automatic' && <p className="alert small">자동 연결은 아직 비활성입니다. 아래 수동 요청문으로 작업을 계속할 수 있습니다.</p>}
         <button type="button" className="button secondary" onClick={createPrompt}>조사 요청문 만들기</button>
-        {researchPrompt && <div className="field"><label htmlFor="research-prompt">외부 AI에 보낼 요청문</label><textarea id="research-prompt" value={researchPrompt} readOnly style={{ minHeight: 190 }} />
+        {researchPrompt && researchPromptId === project.manualResearchRequestId && <div className="field"><label htmlFor="research-prompt">외부 AI에 보낼 요청문</label><textarea id="research-prompt" value={researchPrompt} readOnly style={{ minHeight: 190 }} />
           <button className="button text" type="button" onClick={() => void navigator.clipboard.writeText(researchPrompt).then(() => setNotice('조사 요청문을 복사했습니다.')).catch(() => setError('복사가 되지 않았어요. 요청문을 길게 눌러 선택해 주세요.'))}>요청문 복사</button></div>}
         {project.manualResearchRequestId && <div className="field"><label htmlFor="research-response">AI에서 받은 조사 결과 붙여넣기</label>
           <textarea id="research-response" value={response} onChange={e => setResponse(e.target.value)} placeholder="요청 ID가 포함된 JSON 응답을 붙여넣어 주세요." style={{ minHeight: 140 }} />

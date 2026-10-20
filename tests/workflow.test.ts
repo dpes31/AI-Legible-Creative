@@ -64,6 +64,9 @@ describe('사실과 프로젝트의 무결성', () => {
     expect(result.claims[0].status).toBe('unreviewed');
     expect(() => verifyClaim(result, result.claims[0].id)).toThrow();
     const attached = attachOriginalText(result, result.sources[0].id, '제품의 색상은 파란색입니다.', true);
+    const staleContentId = prepareContent(result).project.manualContentRequestId;
+    expect(attachOriginalText({ ...result, manualContentRequestId: staleContentId }, result.sources[0].id,
+      '제품의 색상은 파란색입니다.', true).manualContentRequestId).toBeNull();
     const checked = verifyClaim(attached, attached.claims[0].id);
     expect(checked.claims[0].status).toBe('supported');
     expect(checked.evidenceRevision).toBe(3);

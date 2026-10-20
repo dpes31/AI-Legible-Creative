@@ -146,6 +146,7 @@ export function verifyClaim(project: Project, claimId: string): Project {
   }
   const claims = project.claims.map(c => c.id === claimId ? { ...c, status: 'supported' as const, reviewedBy: 'human' as const } : c);
   return { ...project, claims, evidenceRevision: project.evidenceRevision + 1,
+    manualResearchRequestId: null, manualContentRequestId: null,
     documents: Object.fromEntries(Object.entries(project.documents).map(([key, doc]) => [key, doc && { ...doc, status: 'stale' }])) as Project['documents'] };
 }
 
@@ -168,6 +169,7 @@ export function attachOriginalText(project: Project, sourceId: string, body: str
       hash: fingerprint(body), publicationAllowed,
     } : s),
     evidenceRevision: project.evidenceRevision + 1,
+    manualResearchRequestId: null, manualContentRequestId: null,
     documents: Object.fromEntries(Object.entries(project.documents).map(([key, doc]) => [key, doc && { ...doc, status: 'stale' }])) as Project['documents'],
   };
 }

@@ -11,6 +11,7 @@ export default function ResultsPage() {
   const { project, loading, update } = useWorkspace();
   const [channel, setChannel] = useState<Channel>('ad_copy');
   const [prompt, setPrompt] = useState('');
+  const [promptId, setPromptId] = useState<string | null>(null);
   const [response, setResponse] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -26,7 +27,7 @@ export default function ResultsPage() {
     status: Object.keys(edits).some(id => document.blocks.some(block => block.id === id)) ? 'stale' as const : document.status };
   const currentProject = visibleDocument ? { ...project, documents: { ...project.documents, [current]: visibleDocument } } : project;
   const createPrompt = () => {
-    const prepared = prepareContent(project); update(prepared.project); setPrompt(prepared.prompt); setError('');
+    const prepared = prepareContent(project); update(prepared.project); setPrompt(prepared.prompt); setPromptId(prepared.project.manualContentRequestId); setError('');
   };
   const pasteContent = () => {
     try {
@@ -66,7 +67,7 @@ export default function ResultsPage() {
         {!project.claims.some(c => c.status === 'supported') && <p className="alert small">확인된 제품 사실이 없습니다. 원문을 확인하거나 ‘자료 보완용 구성안’으로 시작할 수 있습니다.</p>}
         {project.mode === 'automatic' && <p className="alert small">유료 API 연결 전입니다. 외부 AI로 직접 작성할 수 있습니다.</p>}
         <button type="button" className="button secondary" onClick={createPrompt}>채널별 작성 요청문 만들기</button>
-        {prompt && <div className="field"><label htmlFor="content-prompt">외부 AI에 보낼 요청문</label>
+        {prompt && promptId === project.manualContentRequestId && <div className="field"><label htmlFor="content-prompt">외부 AI에 보낼 요청문</label>
           <textarea id="content-prompt" readOnly value={prompt} style={{ minHeight: 190 }} />
           <button type="button" className="button text" onClick={() => void navigator.clipboard.writeText(prompt).then(() => setNotice('작성 요청문을 복사했습니다.')).catch(() => setError('복사가 되지 않았어요. 요청문을 선택해 복사해 주세요.'))}>요청문 복사</button></div>}
         {project.manualContentRequestId && <div className="field"><label htmlFor="content-response">AI에서 받은 작성 결과 붙여넣기</label>
