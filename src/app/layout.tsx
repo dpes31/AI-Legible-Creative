@@ -11,6 +11,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="ko"><body>
-    <WorkspaceProvider><Header /><main className="container page-main">{children}</main></WorkspaceProvider>
+    <WorkspaceProvider><Header /><main id="main-content" tabIndex={-1} className="container page-main">{children}</main></WorkspaceProvider>
   </body></html>;
 }

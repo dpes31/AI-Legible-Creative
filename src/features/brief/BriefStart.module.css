@@ -1,0 +1,83 @@
+.workspace { display:grid; grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:clamp(32px,5.5vw,80px); align-items:start; padding:36px 0 48px; }
+.intro { padding-top:36px; animation:arrive 480ms ease-out both; }
+.kicker { display:flex; gap:9px; align-items:center; font-size:13px; font-weight:650; color:var(--muted); margin-bottom:24px; }
+.kicker > span { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 5px var(--accent-soft); flex:none; }
+.intro h1 { font-size:clamp(36px,4.1vw,56px); line-height:1.22; font-weight:750; letter-spacing:-.055em; word-break:keep-all; margin:0 0 24px; }
+.intro h1 > span { color:var(--accent); }
+.lead { color:var(--muted); font-size:17px; line-height:1.85; word-break:keep-all; }
+.process { margin:48px 0 32px; max-width:360px; }
+.process > div { display:flex; gap:20px; position:relative; padding-bottom:24px; }
+.process > div:last-child { padding-bottom:0; }
+.process > div:not(:last-child)::after { content:''; position:absolute; top:35px; left:17px; bottom:0; width:1px; background:var(--line); }
+.processMark { width:36px; height:36px; flex:none; display:grid; place-items:center; border:1px solid var(--line); border-radius:50%; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; background:#fff; color:var(--muted); }
+.process p { margin:2px 0 0; }
+.process strong { display:block; font-size:15px; font-weight:650; }
+.process p > span { display:block; font-size:13px; color:var(--muted); margin-top:3px; }
+.localNote { font-size:13px; color:var(--muted); line-height:1.8; margin-top:36px; }
+.localNote a { color:var(--muted); text-underline-offset:3px; }
+.form { border-radius:20px; padding:clamp(24px,2.7vw,36px); margin:0; box-shadow:0 16px 60px #192c4710,0 1px 2px #192c4706; animation:arrive 480ms ease-out 80ms both; }
+.formHeading { display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:16px; }
+.formHeading p { margin:0 0 6px; font-size:11px; letter-spacing:.06em; }
+.formHeading h2 { font-size:24px; letter-spacing:-.04em; margin:0; }
+.formMark { display:grid; place-items:center; width:42px; height:42px; border-radius:12px; color:var(--accent); background:var(--accent-soft); font-size:24px; flex:none; }
+.group { margin-bottom:24px; }
+.group :global(.field) { margin-bottom:0; gap:10px; }
+.group :global(.field) > label:first-child { font-size:14px; line-height:1.65; }
+.number { color:#687380; font-size:11px; margin-right:9px; font-variant-numeric:tabular-nums; }
+.form input:not([type='radio']):not([type='checkbox']), .form select { min-height:48px; }
+.kind { display:flex; gap:6px; margin:8px 0 0; padding:0; border:0; }
+.kind label { display:flex; position:relative; align-items:center; gap:6px; border:1px solid var(--input-line); border-radius:7px; color:var(--muted); padding:8px 14px; min-height:44px; cursor:pointer; font-size:13px; transition:background 160ms,border-color 160ms,color 160ms; }
+.kind input { position:absolute; opacity:0; width:1px; height:1px; }
+.kind label:focus-within { outline:3px solid var(--accent); outline-offset:3px; }
+.kind label.selected, .modeChoices label.selected { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+.undecided { margin-top:0; min-height:32px; font-size:13px !important; font-weight:400 !important; }
+.fieldHelp { font-size:12px; line-height:1.7; color:var(--muted); margin:0; }
+.more { border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-bottom:24px; }
+.more summary { min-height:50px; padding:14px 0; font-size:14px; }
+.more[open] summary { margin-bottom:12px; }
+.optional { color:var(--muted); font-size:11px; font-weight:400; margin-left:8px; }
+.mode { border:0; padding:0; margin:0 0 24px; }
+.mode legend { font-size:13px; margin-bottom:10px; font-weight:650; }
+.modeChoices { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.modeChoices label { display:flex; align-items:flex-start; gap:9px; border:1px solid var(--input-line); border-radius:10px; padding:12px; cursor:pointer; transition:background 160ms,border-color 160ms; font-size:13px; font-weight:650; }
+.modeChoices input { margin-top:3px; flex:none; }
+.modeChoices small { display:block; color:var(--muted); margin-top:3px; font-size:11px; font-weight:400; }
+.mode > p { margin-top:10px; }
+.submit { width:100%; min-height:52px; justify-content:space-between; padding-inline:20px; font-size:15px; border-radius:10px; }
+.submit > span { font-size:21px; }
+.submitNote { font-size:12px; text-align:center; color:var(--muted); margin:12px 0 0; line-height:1.7; }
+.resume { margin-top:20px; box-shadow:none; padding:18px 22px; }
+.resumeTitle { flex:1; display:grid; gap:4px; min-width:150px; overflow-wrap:anywhere; }
+.resumeTitle span { font-size:11px; }
+.resume :global(.button) { font-size:13px; padding:8px 12px; }
+.deliverables { display:grid; grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:clamp(32px,5.5vw,80px); padding:36px 0 16px; border-top:1px solid var(--line); }
+.deliverables h2 { font-size:21px; font-weight:650; }
+.deliverables ul { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; }
+.deliverables li { font-size:13px; display:flex; gap:12px; align-items:center; min-height:32px; }
+.deliverables li > span { font-size:10px; color:var(--muted); border-bottom:1px solid var(--line); padding-bottom:2px; }
+@keyframes arrive { from { opacity:.4; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media (max-width:850px) {
+  .workspace { grid-template-columns:1fr; gap:28px; padding-top:20px; }
+  .intro { padding-top:8px; }
+  .intro h1 { font-size:clamp(32px,6vw,44px); margin-bottom:16px; }
+  .kicker { margin-bottom:16px; font-size:12px; }
+  .lead { font-size:15px; margin-bottom:0; }
+  .desktopBreak { display:none; }
+  .process, .localNote { display:none; }
+  .form { padding:24px; }
+  .deliverables { grid-template-columns:1fr; gap:16px; padding-top:28px; }
+  .resumeTitle { flex-basis:100%; }
+}
+@media (max-width:380px) {
+  .form { padding:20px 16px; border-radius:14px; }
+  .formHeading h2 { font-size:21px; }
+  .formMark { width:36px; height:36px; }
+  .modeChoices { grid-template-columns:1fr; }
+  .modeChoices small { display:inline; margin-left:8px; }
+  .optional { display:block; margin:4px 0 0 15px; }
+  .deliverables ul { grid-template-columns:1fr; gap:4px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .intro, .form { animation:none; }
+  .kind label, .modeChoices label { transition:none; }
+}
