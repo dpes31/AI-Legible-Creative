@@ -37,6 +37,13 @@ export async function executeStage(provider: ProviderAdapter, stage: Stage, proj
 }
 
 export function executionConfig(env: Record<string, string | undefined> = process.env) {
+  // The adapter is available for mock review, but real calls stay blocked until
+  // per-step cost reconciliation and project result integration have been verified.
+  // Environment variables alone must never turn on an incomplete paid workflow.
+  const paidPipelineReviewed = false;
+  if (!paidPipelineReviewed) {
+    throw new ApiFailure(503, '자동 실행의 비용 정산과 결과 반영을 검수 중입니다. 외부 AI로 직접 진행해 주세요.');
+  }
   const approved = Number(env.APPROVED_TOTAL_USD || 0);
   const reserve = Number(env.RUN_RESERVE_USD || 0);
   const priceDate = env.OPENAI_PRICE_CONFIRMED_AT && new Date(env.OPENAI_PRICE_CONFIRMED_AT);

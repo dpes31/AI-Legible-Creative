@@ -8,10 +8,14 @@ export const channelNames: Record<Channel, string> = {
 };
 const id = z.string().min(1);
 const shortText = z.string().trim().min(1).max(5000);
+const webUrl = z.url().refine(value => {
+  try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password; }
+  catch { return false; }
+}, 'http 또는 https 링크만 사용할 수 있습니다.');
 export const objectiveSchema = z.enum(['sales', 'feature', 'trust']);
 export type Objective = z.infer<typeof objectiveSchema>;
 export const sourceSchema = z.object({
-  id, projectId: id, title: shortText, url: z.string().url().nullable(),
+  id, projectId: id, title: shortText, url: webUrl.nullable(),
   excerpt: z.string().max(50000), body: z.string().max(300000),
   sourceType: z.enum(['official', 'test', 'independent', 'review', 'user']),
   retrieval: z.enum(['fetched', 'user_provided', 'failed', 'partial']),
@@ -54,6 +58,7 @@ export type DocumentBlock = z.infer<typeof blockSchema>;
 export const documentSchema = z.object({
   id, channel: z.enum(channels), blocks: z.array(blockSchema),
   revision: z.number().int().nonnegative(), evidenceRevision: z.number().int().nonnegative(),
+  reviewedBlocks: z.record(z.string(), z.string()).default({}),
   validationHash: z.string().nullable(),
   status: z.enum(['ready', 'needs_review', 'blocked', 'stale', 'outline']),
   warnings: z.array(z.string()), updatedAt: z.string().datetime(),
@@ -61,7 +66,7 @@ export const documentSchema = z.object({
 export type ChannelDocument = z.infer<typeof documentSchema>;
 export const projectSchema = z.object({
   schemaVersion: z.literal(2), id, ownerId: id, name: shortText, kind: z.enum(['brand', 'product', 'service']),
-  description: z.string().max(1000), officialUrl: z.string().url().or(z.literal('')),
+  description: z.string().max(1000), officialUrl: webUrl.or(z.literal('')),
   objective: objectiveSchema, audience: z.string().max(1000), audienceUndecided: z.boolean(),
   market: z.string().default('KR'), language: z.string().default('ko'),
   selectedChannels: z.array(z.enum(channels)).min(1), mode: z.enum(['manual', 'automatic']),
@@ -70,17 +75,40 @@ export const projectSchema = z.object({
   sources: z.array(sourceSchema), claims: z.array(claimSchema), questions: z.array(questionSchema),
   comparisons: z.array(comparisonSchema), recommendations: z.array(recommendationSchema),
   documents: z.partialRecord(z.enum(channels), documentSchema),
+  documentHistory: z.partialRecord(z.enum(channels), z.array(documentSchema)).default({}),
   manualResearchRequestId: z.string().nullable(), manualContentRequestId: z.string().nullable(),
   previousDraft: z.string().nullable(), migrationNote: z.string().nullable(),
   createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
 });
 export type Project = z.infer<typeof projectSchema>;
 
+export function assertProjectRelations(project: Project): void {
+  const sourceIds = new Set(project.sources.map(item => item.id));
+  const claimIds = new Set(project.claims.map(item => item.id));
+  const comparisonIds = new Set(project.comparisons.map(item => item.id));
+  if (sourceIds.size !== project.sources.length || claimIds.size !== project.claims.length ||
+      comparisonIds.size !== project.comparisons.length ||
+      new Set(project.questions.map(item => item.id)).size !== project.questions.length ||
+      new Set(project.recommendations.map(item => item.id)).size !== project.recommendations.length) {
+    throw new Error('자료 번호가 중복되어 작업을 저장할 수 없습니다.');
+  }
+  if (project.sources.some(item => item.projectId !== project.id) ||
+      project.claims.some(item => item.projectId !== project.id || (item.sourceId && !sourceIds.has(item.sourceId))) ||
+      project.questions.some(item => item.sourceIds.some(id => !sourceIds.has(id))) ||
+      project.comparisons.some(item => [...item.ownClaimIds, ...item.otherClaimIds].some(id => !claimIds.has(id))) ||
+      project.recommendations.some(item => item.claimIds.some(id => !claimIds.has(id)) ||
+        item.comparisonIds.some(id => !comparisonIds.has(id))) ||
+      Object.entries(project.documents).some(([channel, document]) => document &&
+        (document.channel !== channel || document.blocks.some(block => block.claimRefs.some(id => !claimIds.has(id)))))) {
+    throw new Error('다른 작업의 자료가 섞였거나 연결된 근거 번호가 없습니다.');
+  }
+}
+
 export const researchImportSchema = z.object({
   contract: z.literal('alc.research.v1'), requestId: id,
   entity: z.object({ name: shortText }),
   sources: z.array(z.object({
-    ref: id, title: shortText, url: z.string().url().nullable(), excerpt: z.string().max(50000),
+    ref: id, title: shortText, url: webUrl.nullable(), excerpt: z.string().max(50000),
     sourceType: z.enum(['official', 'test', 'independent', 'review', 'user']).default('user'),
   })),
   claims: z.array(z.object({
@@ -120,7 +148,7 @@ export function newProject(input: Pick<Project, 'name' | 'kind' | 'description' 
   return projectSchema.parse({
     ...input, schemaVersion: 2, id: crypto.randomUUID(), ownerId: 'local', market: 'KR', language: 'ko',
     inputRevision: 1, evidenceRevision: 0, revision: 0,
-    sources: [], claims: [], questions: [], comparisons: [], recommendations: [], documents: {},
+    sources: [], claims: [], questions: [], comparisons: [], recommendations: [], documents: {}, documentHistory: {},
     manualResearchRequestId: null, manualContentRequestId: null,
     previousDraft: null, migrationNote: null, createdAt: now, updatedAt: now,
   });

@@ -1,7 +1,8 @@
 import {
   contentImportSchema, researchImportSchema, channels, channelNames,
-  type ChannelDocument, type Claim, type ContentImport, type Project, type ResearchImport, type Source,
+  type ChannelDocument, type Claim, type Project, type ResearchImport, type Source,
 } from './schema';
+import { z } from 'zod';
 
 export class ImportError extends Error {}
 
@@ -171,6 +172,10 @@ export function attachOriginalText(project: Project, sourceId: string, body: str
 export function prepareContent(project: Project): { project: Project; prompt: string } {
   const requestId = project.manualContentRequestId || crypto.randomUUID();
   const approved = project.claims.filter(c => c.status === 'supported' && project.sources.find(s => s.id === c.sourceId)?.publicationAllowed);
+  const allowedIds = new Set(approved.map(claim => claim.id));
+  const supportedReasons = project.recommendations.filter(reason => reason.claimIds.length > 0 &&
+    reason.claimIds.every(id => allowedIds.has(id)) &&
+    reason.comparisonIds.every(id => project.comparisons.some(c => c.id === id && c.comparable && c.verdict !== 'unknown')));
   const channelList = project.selectedChannels.map(channel => `${channel}(${channelNames[channel]})`).join(', ');
   return {
     project: { ...project, manualContentRequestId: requestId },
@@ -179,7 +184,7 @@ export function prepareContent(project: Project): { project: Project; prompt: st
       `requestId: ${requestId}; 대상: ${project.name}; 목적: ${project.objective}; 고객: ${project.audienceUndecided ? '아직 미정' : project.audience}`,
       `선택 채널: ${channelList}`,
       `사용 가능한 주장과 조건: ${approved.map(c => `[${c.id}] ${c.statement}${c.conditions ? ` (조건: ${c.conditions})` : ''}`).join('\n') || '확인된 사실 없음. 사실을 추가하지 말고 자료 보완용 구성안만 작성하세요.'}`,
-      `고객 선택 이유(자료 확인 상태를 유지): ${project.recommendations.map(r => `${r.reason} / 한계: ${r.limitation}`).join('; ') || '확인할 자료 없음'}`,
+      `근거가 연결된 선택 이유 후보(고객 적합성은 여전히 검토 필요): ${supportedReasons.map(r => `${r.reason} / 한계: ${r.limitation}`).join('; ') || '확인한 선택 이유 없음. 경쟁 우위를 주장하지 마세요.'}`,
       '광고카피·상세페이지·보도자료·유튜브 설명·블로그·후기 영상 핵심 문구는 서로 다른 역할의 문서로 작성하세요.',
       '광고카피: 헤드라인·보조 문구·행동 유도 3안. 상세페이지: 첫 화면·선택 이유·사용 조건·FAQ. 보도자료: 확인된 발표 내용만 첫 문단과 본문에. 유튜브: 제목 후보·첫 문단·공식 링크. 블로그: 고객 질문에 바로 답하고 상황별 선택 기준. 후기 영상: 실제 발언이 없다면 인터뷰 질문과 촬영 장면만.',
       '영상·대본이 없으면 유튜브는 제작 전 초안, 실제 후기·녹취가 없으면 후기는 촬영 가이드, 발표 정보가 없으면 보도자료는 발표 전 초안으로 표시하세요.',
@@ -204,6 +209,9 @@ export function validateDocument(project: Project, document: ChannelDocument): C
       const claim = claims.get(ref);
       if (!claim || claim.status !== 'supported') {
         warnings.push('확인되지 않은 주장이 문구에 연결되어 있습니다.'); blocked = true;
+      } else if (!project.sources.some(source => source.id === claim.sourceId && source.publicationAllowed &&
+        source.origin !== 'external_response' && claim.quote && normalize(source.body).includes(normalize(claim.quote)))) {
+        warnings.push('공개 사용이나 원문 대조가 확인되지 않은 근거가 있습니다.'); blocked = true;
       } else if (claim.conditions && !block.text.includes(claim.conditions)) {
         warnings.push(`적용 조건이 문구에서 빠졌습니다: ${claim.conditions}`); blocked = true;
       }
@@ -223,40 +231,78 @@ export function validateDocument(project: Project, document: ChannelDocument): C
   return { ...document, status, warnings: [...new Set(warnings)], validationHash: null };
 }
 
+function blockHash(block: ChannelDocument['blocks'][number]): string {
+  return fingerprint(JSON.stringify([block.kind, block.text, block.claimRefs]));
+}
+
+export function reviewBlock(project: Project, channel: typeof channels[number], blockId: string): Project {
+  const document = project.documents[channel];
+  const block = document?.blocks.find(item => item.id === blockId);
+  if (!document || !block || block.kind === 'note' || document.evidenceRevision !== project.evidenceRevision) {
+    throw new ImportError('문구와 근거의 현재 버전을 먼저 확인해 주세요.');
+  }
+  const checked = validateDocument(project, document);
+  if (checked.status === 'blocked') throw new ImportError('이 문서에 근거가 없거나 조건이 빠진 문장이 있습니다. 먼저 고쳐 주세요.');
+  return { ...project, documents: { ...project.documents, [channel]: {
+    ...document, status: 'needs_review', validationHash: null,
+    reviewedBlocks: { ...document.reviewedBlocks, [blockId]: blockHash(block) },
+  } } };
+}
+
 export function importContent(project: Project, response: string): Project {
-  const parsed = contentImportSchema.safeParse(parseResponse(response));
+  const parsed = z.object({ contract: z.literal('alc.content.v1'), requestId: z.string().min(1),
+    documents: z.array(z.unknown()), unresolvedItems: z.array(z.string()).default([]) }).safeParse(parseResponse(response));
   if (!parsed.success) throw new ImportError(`채널 응답에서 필요한 항목을 찾지 못했어요: ${parsed.error.issues[0]?.path.join('.') || '형식'}`);
-  const data: ContentImport = parsed.data;
+  const data = parsed.data;
   if (!project.manualContentRequestId || data.requestId !== project.manualContentRequestId) throw new ImportError('현재 프로젝트의 작성 응답이 아닙니다.');
   if (!data.documents.length) throw new ImportError('응답에 작성된 채널이 없습니다. 원문을 보존하고 다시 요청해 주세요.');
   const seen = new Set<string>();
   const documents = { ...project.documents };
-  for (const entry of data.documents) {
-    if (!project.selectedChannels.includes(entry.channel) || seen.has(entry.channel)) throw new ImportError('선택하지 않은 채널이나 중복된 채널이 포함되어 있습니다.');
+  const documentHistory = { ...project.documentHistory };
+  const rejected: string[] = [];
+  for (const rawEntry of data.documents) {
+    const valid = contentImportSchema.shape.documents.element.safeParse(rawEntry);
+    if (!valid.success) { rejected.push('응답의 한 채널에서 필요한 항목을 찾지 못함'); continue; }
+    const entry = valid.data;
+    if (!project.selectedChannels.includes(entry.channel) || seen.has(entry.channel)) { rejected.push(`${channelNames[entry.channel]}: 선택하지 않았거나 중복된 채널`); continue; }
+    const missingRef = entry.blocks.flatMap(block => block.claimRefs).find(ref => !project.claims.some(c => c.id === ref));
+    if (missingRef) { rejected.push(`${channelNames[entry.channel]}: 없는 근거 번호 ${missingRef}`); continue; }
     seen.add(entry.channel);
-    for (const block of entry.blocks) for (const ref of block.claimRefs) {
-      if (!project.claims.some(c => c.id === ref)) throw new ImportError(`없는 근거 번호가 문구에 포함되어 있습니다: ${ref}`);
-    }
     const prior = documents[entry.channel];
+    if (prior) documentHistory[entry.channel] = [...(documentHistory[entry.channel] || []), prior];
     const candidate: ChannelDocument = {
       id: prior?.id || crypto.randomUUID(), channel: entry.channel,
       blocks: entry.blocks.map(b => ({ ...b, id: crypto.randomUUID() })),
       revision: (prior?.revision || 0) + 1, evidenceRevision: project.evidenceRevision,
       validationHash: null, status: 'needs_review', warnings: [], updatedAt: new Date().toISOString(),
+      reviewedBlocks: {},
     };
     documents[entry.channel] = validateDocument(project, candidate);
   }
-  return { ...project, documents, manualContentRequestId: null,
-    migrationNote: data.unresolvedItems.length ? `작성 후 확인: ${data.unresolvedItems.join(' · ')}` : project.migrationNote };
+  if (!seen.size) throw new ImportError(`가져올 수 있는 채널이 없습니다. ${rejected.join(' · ') || '응답을 확인해 주세요.'}`);
+  const missing = project.selectedChannels.filter(channel => !seen.has(channel)).map(channel => `${channelNames[channel]}: 응답에서 찾지 못함`);
+  return { ...project, documents, documentHistory, manualContentRequestId: null,
+    migrationNote: [...data.unresolvedItems, ...rejected, ...missing].length ? `작성 후 확인: ${[...data.unresolvedItems, ...rejected, ...missing].join(' · ')}` : project.migrationNote };
 }
 
 export function editDocument(project: Project, channel: typeof channels[number], blocks: ChannelDocument['blocks']): Project {
   const prior = project.documents[channel];
   if (!prior) throw new ImportError('이 채널의 문서를 찾지 못했습니다.');
   const next = validateDocument(project, {
-    ...prior, blocks, revision: prior.revision + 1, status: 'stale', validationHash: null, updatedAt: new Date().toISOString(),
+    ...prior, blocks, reviewedBlocks: {}, revision: prior.revision + 1, status: 'stale', validationHash: null, updatedAt: new Date().toISOString(),
   });
-  return { ...project, documents: { ...project.documents, [channel]: { ...next, status: 'stale' } } };
+  return { ...project, documents: { ...project.documents, [channel]: { ...next, status: 'stale' } },
+    documentHistory: { ...project.documentHistory, [channel]: [...(project.documentHistory[channel] || []), prior] } };
+}
+
+export function restoreDocumentVersion(project: Project, channel: typeof channels[number], previousId: string, revision: number): Project {
+  const previous = project.documentHistory[channel]?.find(doc => doc.id === previousId && doc.revision === revision);
+  const current = project.documents[channel];
+  if (!previous || !current) throw new ImportError('복원할 이전 버전을 찾지 못했습니다.');
+  const restored = validateDocument(project, { ...previous, id: current.id, revision: current.revision + 1,
+    evidenceRevision: project.evidenceRevision, reviewedBlocks: {}, status: 'stale', validationHash: null, updatedAt: new Date().toISOString() });
+  return { ...project, documents: { ...project.documents, [channel]: { ...restored, status: 'stale' } },
+    documentHistory: { ...project.documentHistory, [channel]: [...(project.documentHistory[channel] || []), current] } };
 }
 
 export function reviewDocument(project: Project, channel: typeof channels[number]): Project {
@@ -264,8 +310,8 @@ export function reviewDocument(project: Project, channel: typeof channels[number
   if (!document || document.evidenceRevision !== project.evidenceRevision) throw new ImportError('근거가 바뀌었습니다. 이 채널을 다시 작성하거나 확인해 주세요.');
   const checked = validateDocument(project, document);
   if (checked.status === 'blocked' || checked.status === 'outline') throw new ImportError('확인되지 않은 사실이나 자료가 남아 있어 최종본으로 표시할 수 없습니다.');
-  if (checked.blocks.some(b => (b.kind === 'paragraph' || b.kind === 'bullet') && !b.claimRefs.length)) {
-    throw new ImportError('근거가 연결되지 않은 본문이 있습니다. 검토용 초안으로 사용하거나 근거를 연결해 주세요.');
+  if (checked.blocks.some(b => b.kind !== 'note' && document.reviewedBlocks[b.id] !== blockHash(b))) {
+    throw new ImportError('공개 문장을 하나씩 읽고 근거 또는 사실이 없는 표현인지 확인해 주세요.');
   }
   if ((channel === 'review_video' && !project.sources.some(s => s.sourceType === 'review')) ||
       (channel === 'press_release' && !project.sources.some(s => /발표|출시/.test(s.title)))) {

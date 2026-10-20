@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { channelNames, type Channel } from '@/domain/schema';
-import { editDocument, importContent, prepareContent, reviewDocument } from '@/domain/workflow';
-import { downloadBlob, downloadableText, downloadZip, serializeDocument, serializeWithSources } from '@/lib/export';
+import { editDocument, importContent, prepareContent, restoreDocumentVersion, reviewBlock, reviewDocument } from '@/domain/workflow';
+import { downloadBlob, downloadableText, downloadZip, serializeDocument, serializeMarkdown, serializeWithSources } from '@/lib/export';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 
 export default function ResultsPage() {
@@ -32,7 +32,7 @@ export default function ResultsPage() {
     try {
       const incoming = importContent(project, response);
       if (Object.keys(project.documents).some(key => incoming.documents[key as Channel] !== project.documents[key as Channel])) {
-        if (Object.keys(project.documents).length && !window.confirm('기존 채널 문구가 있습니다. 현재 내용을 덮어쓰지 않고 새 버전으로 가져오시겠어요?')) return;
+        if (Object.keys(project.documents).length && !window.confirm('기존 문구를 이전 버전으로 보관하고 새 문구를 가져올까요?')) return;
       }
       update(incoming); setResponse(''); setError(''); setNotice('채널별 문구를 가져왔습니다. 근거와 표현을 확인해 주세요.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : '작성 결과를 읽지 못했어요.'); }
@@ -58,6 +58,7 @@ export default function ResultsPage() {
   return <>
     <section className="hero"><div className="eyebrow">3. 결과 받기</div><h1>채널에 맞는 문구를 각각 만듭니다.</h1>
       <p className="muted">하나의 본문을 여섯 탭에 복제하지 않습니다. 근거가 부족한 문구는 검토용 초안으로 표시합니다.</p></section>
+    {project.migrationNote && <p className="alert" role="status">{project.migrationNote}</p>}
     {error && <p className="alert" role="alert">{error}</p>}
     {notice && <p className="small muted" role="status">{notice}</p>}
     <div className="grid">
@@ -82,6 +83,7 @@ export default function ResultsPage() {
       {project.selectedChannels.map(c => <button key={c} type="button" className={c === current ? 'button' : 'button secondary'} onClick={() => setChannel(c)} aria-pressed={c === current}>{channelNames[c]}{project.documents[c] ? ' ●' : ''}</button>)}
     </div>
     <div className="grid"><section className="card">
+      {project.previousDraft && <details><summary>예전 앱에서 가져온 초안 보기</summary><pre className="output">{project.previousDraft}</pre><p className="small muted">이전 초안입니다. 현재 확인된 문구나 근거로 간주하지 않습니다.</p></details>}
       <h2>{channelNames[current]} {document && <span className={document.status === 'blocked' ? 'badge error' : document.status === 'ready' ? 'badge' : 'badge warn'}>
         {document.status === 'ready' ? '현재 버전 확인' : document.status === 'blocked' ? '근거 보완 필요' : document.status === 'outline' ? '자료 보완용 구성안' : document.status === 'stale' ? '수정 후 다시 확인' : '검토용 초안'}
       </span>}</h2>
@@ -92,8 +94,25 @@ export default function ResultsPage() {
           <textarea id={`block-${block.id}`} value={edits[block.id] ?? block.text} onChange={e => setEdits(old => ({ ...old, [block.id]: e.target.value }))} onBlur={() => edit(block.id)} />
         </div>
         {!!block.claimRefs.length && <div className="small muted">연결된 근거: {block.claimRefs.map(id => project.claims.find(claim => claim.id === id)?.statement || '근거를 찾지 못함').join(' · ')}</div>}
+        {block.kind !== 'note' && <div className="small"><p>{block.claimRefs.length
+          ? '원문과 이 문장의 의미·대상·조건이 맞는지 직접 확인해 주세요. 원문 링크와 인용문은 오른쪽에 있습니다.'
+          : '이 문장에 사실·효능·경쟁 우위·실제 경험이 없는지 확인해 주세요.'}</p>
+          {document.reviewedBlocks[block.id] && <p className="muted">이 버전의 문장 확인 기록이 있습니다. 수정하면 다시 확인해야 합니다.</p>}
+          <button type="button" className="button secondary" disabled={edits[block.id] !== undefined} onClick={() => {
+            try { update(reviewBlock(project, current, block.id)); setError(''); setNotice('이 문장에 대한 확인을 기록했습니다.'); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : '문장을 확인하지 못했어요.'); }
+          }}>이 문장 확인했어요</button>
+        </div>}
       </div>)}
-      {document && <div className="row"><button type="button" className="button secondary" onClick={approve}>현재 문구와 근거 확인하기</button>
+      {!!project.documentHistory[current]?.length && <details><summary>이전 버전 {project.documentHistory[current]?.length}개 보기</summary>
+        {project.documentHistory[current]?.slice(-10).reverse().map(old => <div className="document-block" key={`${old.id}-${old.revision}`}>
+          <strong>버전 {old.revision}</strong><pre className="output">{serializeDocument(old)}</pre>
+          <button className="button secondary" type="button" onClick={() => {
+            try { update(restoreDocumentVersion(project, current, old.id, old.revision)); setEdits({}); setNotice('이전 본문을 새 버전으로 가져왔습니다. 근거와 표현을 다시 확인해 주세요.'); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : '이전 버전을 복원하지 못했어요.'); }
+          }}>이 본문 다시 사용하기</button>
+        </div>)}</details>}
+      {document && <div className="row"><button type="button" className="button secondary" onClick={approve}>모든 문장 확인 완료</button>
         <p className="small muted">바꾸면 이 채널의 이전 확인 상태가 취소됩니다.</p></div>}
     </section>
     <aside className="card"><h2>본문과 근거</h2>
@@ -103,6 +122,7 @@ export default function ResultsPage() {
           const claim = project.claims.find(c => c.id === id);
           const source = project.sources.find(s => s.id === claim?.sourceId);
           return claim && <div className="document-block small" key={id}><strong>{claim.statement}</strong><br />
+            <blockquote>{claim.quote || '원문 구간 없음'}</blockquote>
             {source ? <>{source.title} · {source.origin === 'fetched' ? '본문 수집' : '사용자 원문 확인'}{source.url && <> · <a href={source.url} rel="noreferrer" target="_blank" className="source-link">원문 링크</a></>}</> : '출처 없음'}
           </div>;
         })}
@@ -112,6 +132,7 @@ export default function ResultsPage() {
       <button type="button" className="button" onClick={() => void copy(false)}>본문 복사</button>
       <button type="button" className="button secondary" onClick={() => void copy(true)}>출처 포함 복사</button>
       <button type="button" className="button secondary" onClick={() => visibleDocument && downloadBlob(`${channelNames[current]}.txt`, new Blob([downloadableText(project, visibleDocument, true)], { type: 'text/plain;charset=utf-8' }))}>이 문서 받기</button>
+      <button type="button" className="button secondary" onClick={() => visibleDocument && downloadBlob(`${channelNames[current]}.md`, new Blob([`${visibleDocument.status === 'ready' ? '' : '> 검토용 초안 — 근거와 표현을 확인해 주세요.\n\n'}${serializeMarkdown(visibleDocument)}\n`], { type: 'text/markdown;charset=utf-8' }))}>마크다운 받기</button>
       <button type="button" className="button secondary" onClick={() => void downloadZip(currentProject).catch(cause => setError(cause instanceof Error ? cause.message : '파일을 만들지 못했어요.'))}>전체 파일 받기</button>
     </div>}
     {document && !serializeDocument(document) && <p className="alert">빈 문서는 복사·다운로드할 수 없습니다.</p>}

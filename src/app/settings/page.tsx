@@ -14,13 +14,13 @@ export default function SettingsPage() {
     if (!project) return;
     downloadBlob(`${project.name.replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 35) || '작업'}_백업.json`,
       new Blob([JSON.stringify(project, null, 2)], { type: 'application/json;charset=utf-8' }));
-    setMessage('현재 브라우저의 작업 백업을 받았습니다. 보관 위치를 확인해 주세요.');
+    setMessage('백업 다운로드를 시작했습니다. 파일이 저장됐는지 확인해 주세요.');
   };
   const backupLegacy = () => {
     const raw = localStorage.getItem('origin-mvp-store');
     if (!raw) { setMessage('이 브라우저에서 이전 자료를 찾지 못했습니다.'); return; }
     downloadBlob('origin_legacy_original.json', new Blob([raw], { type: 'application/json;charset=utf-8' }));
-    setMessage('이전 자료 원본을 받았습니다. 새 작업과 섞이지 않도록 보관해 주세요.');
+    setMessage('이전 자료 원본의 다운로드를 시작했습니다. 파일이 저장됐는지 확인해 주세요.');
   };
   const restoreFile = async (file?: File) => {
     if (!file) return;

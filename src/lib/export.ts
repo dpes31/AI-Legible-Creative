@@ -4,6 +4,15 @@ export function serializeDocument(document: ChannelDocument): string {
   return document.blocks.filter(b => b.kind !== 'note' && b.text.trim()).map(b => b.text.trim()).join('\n\n').trim();
 }
 
+export function serializeMarkdown(document: ChannelDocument): string {
+  return document.blocks.filter(b => b.kind !== 'note' && b.text.trim()).map(block => {
+    const content = block.text.trim();
+    if (block.kind === 'heading') return `## ${content}`;
+    if (block.kind === 'bullet') return `- ${content}`;
+    return content;
+  }).join('\n\n').trim();
+}
+
 export function serializeWithSources(project: Project, document: ChannelDocument): string {
   const main = serializeDocument(document);
   const claimIds = new Set(document.blocks.flatMap(block => block.claimRefs));
@@ -32,6 +41,7 @@ export async function downloadZip(project: Project) {
     const doc = project.documents[channel];
     if (!doc || !serializeDocument(doc)) continue;
     zip.file(`${channelNames[channel]}.txt`, downloadableText(project, doc, true)); count++;
+    zip.file(`${channelNames[channel]}.md`, `${doc.status === 'ready' ? '' : '> 검토용 초안 — 근거와 표현을 확인해 주세요.\n\n'}${serializeMarkdown(doc)}\n`);
   }
   if (!count) throw new Error('받을 문구가 아직 없습니다. 먼저 채널별 문구를 가져와 주세요.');
   zip.file('읽어주세요.txt', `작업: ${project.name}\n준비된 문서 ${count}개. '검토용 초안'은 공개 전에 근거·표현을 확인해 주세요.\n내부 자료와 API 비밀정보는 포함하지 않았습니다.`);

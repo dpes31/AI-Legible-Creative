@@ -12,6 +12,11 @@ describe('유료 실행의 경계', () => {
   it('키만 있거나 예산 승인이 없으면 호출 가능 상태가 아니다', () => {
     expect(capabilities({ OPENAI_API_KEY: 'test', OPENAI_RESEARCH_MODEL: 'a', OPENAI_WRITE_MODEL: 'a' }).paidExecutionEnabled).toBe(false);
     expect(() => executionConfig({ OPENAI_API_KEY: 'test', OPENAI_RESEARCH_MODEL: 'a', OPENAI_WRITE_MODEL: 'a', PAID_EXECUTION_ENABLED: 'false' })).toThrow();
+    const completeLookingConfig = { OPENAI_API_KEY: 'test', OPENAI_RESEARCH_MODEL: 'a', OPENAI_WRITE_MODEL: 'a',
+      NEXT_PUBLIC_SUPABASE_URL: 'https://example.org', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'public',
+      PAID_EXECUTION_ENABLED: 'true', APPROVED_TOTAL_USD: '10', RUN_RESERVE_USD: '1', OPENAI_PRICE_CONFIRMED_AT: new Date().toISOString() };
+    expect(capabilities(completeLookingConfig).paidExecutionEnabled).toBe(false);
+    expect(() => executionConfig(completeLookingConfig)).toThrow();
   });
   it('단계는 순서대로 한 건씩 고르고 모의 공급자 응답을 전달한다', async () => {
     const project = sample();
@@ -27,6 +32,10 @@ describe('유료 실행의 경계', () => {
     expect(() => inspectResponse({ id: 'r', status: 'incomplete', output_text: '', output: [] })).toThrow(ProviderFailure);
     expect(() => inspectResponse({ id: 'r', status: 'completed', output_text: ' ', output: [] })).toThrow(ProviderFailure);
     expect(() => inspectResponse({ id: 'r', status: 'completed', output_text: '거절', output: [{ type: 'message', content: [{ type: 'refusal' }] }] })).toThrow(ProviderFailure);
+    const cited = inspectResponse({ id: 'r', status: 'completed', output_text: '자료 인용', output: [{ type: 'message', content: [{ type: 'output_text', annotations: [
+      { type: 'url_citation', title: '원문 자료', url: 'https://example.org/a', start_index: 0, end_index: 4 },
+    ] }] }] });
+    expect(cited.citations).toEqual([{ title: '원문 자료', url: 'https://example.org/a', start: 0, end: 4 }]);
   });
   it('업로드 자료의 소유자와 참조 관계를 서버가 다시 검증하고 과거 승인을 무효화한다', () => {
     const project = sample();

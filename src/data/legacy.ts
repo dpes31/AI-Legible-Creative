@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { channels, newProject, type Project } from '@/domain/schema';
 
+function oldWebUrl(value?: string) {
+  try { const url = value && new URL(value); return url && ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.toString() : null; }
+  catch { return null; }
+}
+
 const legacySchema = z.object({
   state: z.object({
     clientName: z.string().trim().min(1), usp: z.string().optional(),
@@ -26,12 +31,22 @@ export function convertLegacy(raw: string): Project {
     return { id, text: question.question, provenance: 'hypothesis' as const, sourceIds: [] };
   });
   const factIds = new Set<number>();
+  const linkedSources = new Map<number, string>();
+  project.sources = old.phase4Facts.flatMap(fact => {
+    const url = oldWebUrl(fact.sourceUrl);
+    if (!url) return [];
+    const id = crypto.randomUUID(); linkedSources.set(fact.id, id);
+    return [{ id, projectId: project.id, title: `이전 근거 ${fact.id}의 링크`, url,
+      excerpt: '', body: '', sourceType: 'user' as const, retrieval: 'partial' as const,
+      origin: 'external_response' as const, publishedAt: null, collectedAt: project.createdAt,
+      externalAiAllowed: false, publicationAllowed: false, hash: `legacy-url:${fact.id}` }];
+  });
   project.claims = old.phase4Facts.map(fact => {
     if (factIds.has(fact.id)) throw new Error('이전 자료의 근거 번호가 중복됩니다. 원본을 확인해 주세요.');
     factIds.add(fact.id);
     return {
       id: crypto.randomUUID(), projectId: project.id, statement: fact.fact,
-      sourceId: null, quote: '', conditions: '', subject: project.name,
+      sourceId: linkedSources.get(fact.id) || null, quote: '', conditions: '', subject: project.name,
       status: 'unreviewed' as const, reviewedBy: null,
     };
   });

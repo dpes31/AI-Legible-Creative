@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import { projectSchema, type Project } from '@/domain/schema';
+import { assertProjectRelations, projectSchema, type Project } from '@/domain/schema';
 import { convertLegacy } from './legacy';
 
 const DB_NAME = 'alc-projects-v2';
@@ -33,6 +33,7 @@ export async function loadProject(id: string): Promise<Project | null> {
 
 export async function saveProject(project: Project, expectedRevision: number | null): Promise<Project> {
   const valid = projectSchema.parse(project);
+  assertProjectRelations(valid);
   const db = await database();
   const tx = db.transaction('projects', 'readwrite');
   const current = await tx.store.get(valid.id) as Project | undefined;
@@ -74,6 +75,7 @@ export async function migrateLegacy(): Promise<{ status: 'none' | 'already' | 'm
 
 export async function importBackup(text: string): Promise<Project> {
   const value = projectSchema.parse(JSON.parse(text));
+  assertProjectRelations(value);
   const db = await database();
   const existing = await db.get('projects', value.id);
   if (existing) throw new RevisionConflict();

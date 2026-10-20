@@ -33,7 +33,7 @@ export default function ReviewPage() {
     if (!title.trim() || !body.trim()) { setError('자료 이름과 실제 본문을 넣어 주세요. 링크만으로 원문 확인이 끝나지 않습니다.'); return; }
     if (body.length > 50000) { setError('원문이 5만 자를 넘습니다. 필요한 구간을 선택해 넣어 주세요.'); return; }
     try {
-      if (url.trim()) new URL(url.trim());
+      if (url.trim()) { const parsed = new URL(url.trim()); if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('invalid url'); }
       const source: Source = {
         id: crypto.randomUUID(), projectId: project.id, title: title.trim(), url: url.trim() || null,
         excerpt: body.trim(), body: body.trim(), sourceType: 'user', retrieval: 'user_provided',
