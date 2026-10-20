@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { newProject, type Project } from '../src/domain/schema';
 import { editDocument, importContent, importResearch, restoreDocumentVersion } from '../src/domain/workflow';
-import { downloadableText, serializeDocument, serializeMarkdown } from '../src/lib/export';
+import { buildZip, downloadableText, serializeDocument, serializeMarkdown } from '../src/lib/export';
 
 const fixture = (name: string) => readFileSync(join(process.cwd(), 'tests/fixtures/manual', name), 'utf8');
 function project(): Project { return { ...newProject({ name: '가상 브랜드 솔담 보온컵', kind: 'product', description: '', officialUrl: '', objective: 'feature', audience: '', audienceUndecided: true,
@@ -58,9 +58,11 @@ describe('허구의 여섯 채널 기능 검수', () => {
     expect(restored.documentHistory.ad_copy).toHaveLength(2);
   });
   it('실제 ZIP 압축 파일에서 한글 파일을 열 수 있다', async () => {
-    const zip = new JSZip(); zip.file('광고카피.txt', downloadableText(project(), importContent(project(), fixture('content.partial.json')).documents.ad_copy!));
-    const archive = await zip.generateAsync({ type: 'uint8array' });
-    const opened = await JSZip.loadAsync(archive);
+    const written = importContent(project(), fixture('content.partial.json'));
+    const opened = await JSZip.loadAsync(await (await buildZip(written)).arrayBuffer());
     expect(await opened.file('광고카피.txt')?.async('string')).toContain('검토용 제목');
+    expect(await opened.file('읽어주세요.txt')?.async('string')).toContain('블로그: 작성된 문서 없음');
+    expect(await opened.file('공개 출처.txt')?.async('string')).toContain('공개 가능한 출처 없음');
+    expect(opened.file('광고카피.md')).not.toBeNull();
   });
 });
