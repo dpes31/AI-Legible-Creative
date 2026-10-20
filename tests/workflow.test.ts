@@ -122,6 +122,18 @@ describe('사실과 프로젝트의 무결성', () => {
     p.recommendations = [{ id: 'guess', situation: '출근', reason: '경쟁 제품보다 무조건 우수', claimIds: [], comparisonIds: [], limitation: '' }];
     expect(prepareContent(p).prompt).not.toContain('무조건 우수');
   });
+  it('공개 사용만 허용한 근거는 외부 AI 작성 요청문에서 제외한다', () => {
+    const p = project();
+    p.sources = [{ id: 'private-source', projectId: p.id, title: '내부 설명', url: null,
+      excerpt: '내부에서만 확인한 특징', body: '내부에서만 확인한 특징', sourceType: 'user',
+      retrieval: 'user_provided', origin: 'direct_input', publishedAt: null,
+      collectedAt: p.createdAt, externalAiAllowed: false, publicationAllowed: true, hash: 'h' }];
+    p.claims = [{ id: 'private-claim', projectId: p.id, statement: '내부에서만 확인한 특징', sourceId: 'private-source',
+      quote: '내부에서만 확인한 특징', conditions: '', subject: p.name, status: 'supported', reviewedBy: 'human' }];
+    expect(prepareContent(p).prompt).not.toContain('내부에서만 확인한 특징');
+    p.sources[0].externalAiAllowed = true;
+    expect(prepareContent(p).prompt).toContain('내부에서만 확인한 특징');
+  });
 
   it('구버전 승인 상태를 이어받지 않고 끊어진 질문 관계를 알린다', () => {
     const migrated = convertLegacy(JSON.stringify({ state: {

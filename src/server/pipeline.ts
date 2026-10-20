@@ -32,7 +32,8 @@ export async function executeStage(provider: ProviderAdapter, stage: Stage, proj
   }
   const channel = stage.slice('channel:'.length);
   if (!project.selectedChannels.includes(channel as Project['selectedChannels'][number])) throw new ApiFailure(422, '선택하지 않은 문서입니다.');
-  const permitted = project.claims.filter(c => c.status === 'supported' && project.sources.find(s => s.id === c.sourceId)?.publicationAllowed);
+  const permitted = project.claims.filter(c => c.status === 'supported' && project.sources.some(s =>
+    s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed));
   return provider.generateStructured(`alc.content.v1 계약. requestId는 ${requestId}. 채널 ${channel} 한 개만 한국어로 작성하세요. 대상 ${project.name}, 모델 ${project.model || '미지정'}, 목적 ${project.objective}, 고객 ${project.audience}. 허용 주장과 조건: ${JSON.stringify(permitted.map(c => ({ id: c.id, statement: c.statement, conditions: c.conditions })))}. 없는 후기, 인용, 수치, 우위를 창작하지 마세요.`, 'content');
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newProject } from '../src/domain/schema';
-import { MockProvider, inspectResponse, ProviderFailure } from '../src/server/providers';
+import { MockProvider, inspectResponse, ProviderFailure, type ProviderAdapter } from '../src/server/providers';
 import { executionConfig, executeStage, inputHash, nextStage } from '../src/server/pipeline';
 import { capabilities } from '../src/server/capabilities';
 import { serverProject } from '../src/server/project-store';
@@ -28,6 +28,19 @@ describe('유료 실행의 경계', () => {
     expect((await executeStage(provider, 'normalize', project, 'run-1', result)).text).toBe(result.text);
     expect(inputHash({ ...project, audience: '바뀐 고객' })).not.toBe(inputHash(project));
     expect(inputHash({ ...project, model: '2026년형' })).not.toBe(inputHash(project));
+  });
+  it('자동 작성 단계에도 외부 전달을 허용하지 않은 주장을 넣지 않는다', async () => {
+    const p = sample();
+    p.sources = [{ id: 'source', projectId: p.id, title: '내부', url: null, excerpt: '기밀 특징', body: '기밀 특징',
+      sourceType: 'user', retrieval: 'user_provided', origin: 'direct_input', publishedAt: null,
+      collectedAt: p.createdAt, externalAiAllowed: false, publicationAllowed: true, hash: 'h' }];
+    p.claims = [{ id: 'claim', projectId: p.id, statement: '기밀 특징', sourceId: 'source', quote: '기밀 특징',
+      conditions: '', subject: p.name, status: 'supported', reviewedBy: 'human' }];
+    let sent = '';
+    const provider: ProviderAdapter = { research: async () => result,
+      generateStructured: async prompt => { sent = prompt; return result; }, validateClaims: async () => result };
+    await executeStage(provider, 'channel:ad_copy', p, 'run');
+    expect(sent).not.toContain('기밀 특징');
   });
   it('거절·중단·빈 응답을 성공으로 포장하지 않는다', () => {
     expect(() => inspectResponse({ id: 'r', status: 'incomplete', output_text: '', output: [] })).toThrow(ProviderFailure);

@@ -176,7 +176,8 @@ export function attachOriginalText(project: Project, sourceId: string, body: str
 
 export function prepareContent(project: Project): { project: Project; prompt: string } {
   const requestId = project.manualContentRequestId || crypto.randomUUID();
-  const approved = project.claims.filter(c => c.status === 'supported' && project.sources.find(s => s.id === c.sourceId)?.publicationAllowed);
+  const approved = project.claims.filter(c => c.status === 'supported' && project.sources.some(s =>
+    s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed));
   const allowedIds = new Set(approved.map(claim => claim.id));
   const supportedReasons = project.recommendations.filter(reason => reason.claimIds.length > 0 &&
     reason.claimIds.every(id => allowedIds.has(id)) &&
