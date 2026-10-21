@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { newProject } from '../src/domain/schema';
-import { importBackup, importLegacyBackup, loadProject, saveProject } from '../src/data/repository';
+import { listConflictDrafts, importBackup, importLegacyBackup, loadProject, saveProject } from '../src/data/repository';
 
 describe('브라우저 프로젝트 보존', () => {
   it('동일 프로젝트를 두 탭에서 수정하면 오래된 revision을 거절하고 저장본을 보존한다', async () => {
@@ -9,6 +9,8 @@ describe('브라우저 프로젝트 보존', () => {
     const saved = await saveProject(original, null);
     const changed = await saveProject({ ...saved, description: '첫 번째 수정' }, saved.revision);
     await expect(saveProject({ ...saved, description: '두 번째 수정' }, saved.revision)).rejects.toThrow('다른 창');
+    const conflicts = await listConflictDrafts();
+    expect(conflicts.find(draft => draft.project.id === saved.id)?.project.description).toBe('두 번째 수정');
     expect((await loadProject(saved.id))?.description).toBe('첫 번째 수정');
     expect(changed.revision).toBe(2);
     await expect(importBackup(JSON.stringify(changed))).rejects.toThrow();

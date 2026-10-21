@@ -17,7 +17,7 @@ function database(): Promise<IDBPDatabase> {
 }
 
 export class RevisionConflict extends Error {
-  constructor() { super('다른 창에서 이 작업을 수정했습니다. 새로고침 전에 현재 내용을 복사해 보관해 주세요.'); }
+  constructor(readonly recoveryId?: string) { super(recoveryId ? '다른 창에서 수정한 내용과 겹쳤습니다. 이 창의 초안도 별도 보관했습니다. 설정에서 충돌 초안을 확인해 주세요.' : '같은 작업이 이미 있습니다. 기존 작업을 덮어쓰지 않았습니다.'); }
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -35,15 +35,16 @@ export async function saveProject(project: Project, expectedRevision: number | n
   const valid = projectSchema.parse(project);
   assertProjectRelations(valid);
   const db = await database();
-  const tx = db.transaction('projects', 'readwrite');
-  const current = await tx.store.get(valid.id) as Project | undefined;
+  const tx = db.transaction(['projects', 'metadata'], 'readwrite');
+  const current = await tx.objectStore('projects').get(valid.id) as Project | undefined;
   if ((current?.revision ?? null) !== expectedRevision) {
-    tx.abort();
-    void tx.done.catch(() => undefined);
-    throw new RevisionConflict();
+    const recoveryId = crypto.randomUUID();
+    await tx.objectStore('metadata').put({ id: recoveryId, at: new Date().toISOString(), project: valid }, `conflict:${recoveryId}`);
+    await tx.done;
+    throw new RevisionConflict(recoveryId);
   }
   const next = projectSchema.parse({ ...valid, revision: (current?.revision ?? 0) + 1, updatedAt: new Date().toISOString() });
-  await tx.store.put(next);
+  await tx.objectStore('projects').put(next);
   await tx.done;
   return next;
 }
@@ -93,4 +94,19 @@ export async function importLegacyBackup(text: string): Promise<Project> {
   await tx.objectStore('metadata').put(saved.id, key);
   await tx.done;
   return saved;
+}
+
+
+export type ConflictDraft = { id: string; at: string; project: Project };
+export async function listConflictDrafts(): Promise<ConflictDraft[]> {
+  const db = await database();
+  const tx = db.transaction('metadata');
+  const keys = await tx.store.getAllKeys();
+  const drafts = await Promise.all(keys.filter(key => String(key).startsWith('conflict:')).map(key => tx.store.get(key) as Promise<ConflictDraft>));
+  await tx.done;
+  return drafts.sort((a, b) => b.at.localeCompare(a.at));
+}
+export async function preserveConflictDraft(id: string, project: Project): Promise<void> {
+  const valid = projectSchema.parse(project); assertProjectRelations(valid);
+  await (await database()).put('metadata', { id, at: new Date().toISOString(), project: valid }, `conflict:${id}`);
 }

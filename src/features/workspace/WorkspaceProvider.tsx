@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { importBackup, importLegacyBackup, listProjects, loadProject, migrateLegacy, saveProject } from '@/data/repository';
+import { RevisionConflict, preserveConflictDraft, importBackup, importLegacyBackup, listProjects, loadProject, migrateLegacy, saveProject } from '@/data/repository';
 import { type Project } from '@/domain/schema';
 
 type Workspace = {
@@ -75,6 +75,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         setProjects(await listProjects());
       } catch (cause) {
         blocked.current = true; setSaveState('error');
+        if (cause instanceof RevisionConflict && cause.recoveryId && projectRef.current?.id === next.id) {
+          try { await preserveConflictDraft(cause.recoveryId, projectRef.current); }
+          catch { setError('충돌한 최신 초안을 보관하지 못했어요. 현재 내용을 백업해 주세요.'); return; }
+        }
         setError(cause instanceof Error ? cause.message : '저장하지 못했어요. 현재 내용을 복사해 보관해 주세요.');
       }
     });
