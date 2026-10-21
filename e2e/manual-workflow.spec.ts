@@ -152,7 +152,7 @@ test('실제 제품 응답의 이름 차이와 우위 표기를 버튼 옆에서
   await page.getByRole('button', { name: '같은 제품임을 확인하고 가져오기' }).click();
   await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
   await expect(page.getByText('원문 확인이 필요한 주장이 2개 있습니다.', { exact: false })).toBeVisible();
-  await expect(page.getByText('인용문이 일치하지 않음: C2', { exact: false }).first()).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="analysis-summary"]').getByText('인용문이 일치하지 않음: C2', { exact: false })).toBeVisible();
   await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
   await page.screenshot({ path: testInfo.outputPath('actual-response-alias-mobile.png'), fullPage: true });
