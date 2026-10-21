@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { convertLegacy } from '../src/data/legacy';
-import { attachOriginalText, editDocument, importContent, importResearch, prepareContent, prepareResearch, reviewBlock, reviewDocument, validateDocument, verifyClaim } from '../src/domain/workflow';
+import { attachOriginalText, editDocument, importContent, importResearch, prepareContent, prepareResearch, reviewDocument, validateDocument, verifyClaim } from '../src/domain/workflow';
 import { assertProjectRelations, newProject, projectSchema, type ChannelDocument } from '../src/domain/schema';
 import { assessRecommendation } from '../src/domain/analysis/recommendations';
+import { approveInsight } from '../src/domain/insight';
 
 function project() {
   return newProject({
@@ -65,7 +66,7 @@ describe('사실과 프로젝트의 무결성', () => {
     expect(result.claims[0].status).toBe('unreviewed');
     expect(() => verifyClaim(result, result.claims[0].id)).toThrow();
     const attached = attachOriginalText(result, result.sources[0].id, '제품의 색상은 파란색입니다.', true);
-    const staleContentId = prepareContent(result).project.manualContentRequestId;
+    const staleContentId = prepareContent(approveInsight(result, true)).project.manualContentRequestId;
     expect(attachOriginalText({ ...result, manualContentRequestId: staleContentId }, result.sources[0].id,
       '제품의 색상은 파란색입니다.', true).manualContentRequestId).toBeNull();
     const checked = verifyClaim(attached, attached.claims[0].id);
@@ -80,13 +81,13 @@ describe('사실과 프로젝트의 무결성', () => {
       revision: 1, evidenceRevision: 0, reviewedBlocks: {}, validationHash: null, status: 'needs_review', warnings: [], updatedAt: new Date().toISOString(),
     };
     expect(validateDocument(p, doc).status).toBe('blocked');
-    const prepared = prepareContent(p).project;
+    const prepared = prepareContent(approveInsight(p, true)).project;
     expect(() => importContent(prepared, JSON.stringify({ contract: 'alc.content.v1', requestId: prepared.manualContentRequestId,
       documents: [{ channel: 'ad_copy', blocks: [{ kind: 'paragraph', text: '문구', claimRefs: ['missing'] }] }], unresolvedItems: [],
     }))).toThrow();
   });
 
-  it('문단별 확인 전에는 최종본으로 처리하지 않고 수정 후 확인을 지운다', () => {
+  it('반복 문단 확인 없이 채널을 검토하되 빈약한 구조와 수정된 본문은 최종본으로 넘기지 않는다', () => {
     const initial = project();
     const sourceId = crypto.randomUUID();
     const claimId = crypto.randomUUID();
@@ -94,7 +95,7 @@ describe('사실과 프로젝트의 무결성', () => {
       sources: [{ id: sourceId, projectId: initial.id, title: '허구 원문', url: null,
         excerpt: '뚜껑을 돌려 닫습니다.', body: '뚜껑을 돌려 닫습니다.', sourceType: 'user' as const,
         retrieval: 'user_provided' as const, origin: 'direct_input' as const, publishedAt: null,
-        collectedAt: initial.createdAt, externalAiAllowed: false, publicationAllowed: true, hash: 'body' }],
+        collectedAt: initial.createdAt, externalAiAllowed: true, publicationAllowed: true, hash: 'body' }],
       claims: [{ id: claimId, projectId: initial.id, statement: '뚜껑을 돌려 닫습니다.', sourceId,
         quote: '뚜껑을 돌려 닫습니다.', conditions: '', subject: initial.name,
         status: 'supported' as const, reviewedBy: 'human' as const }],
@@ -104,24 +105,32 @@ describe('사실과 프로젝트의 무결성', () => {
         blocks: [{ id: 'heading', kind: 'heading' as const, text: '어떤 컵을 찾으세요?', claimRefs: [] },
           { id: 'fact', kind: 'paragraph' as const, text: '뚜껑을 돌려 닫습니다.', claimRefs: [claimId] }] } },
     };
-    expect(() => reviewDocument(withEvidence, 'ad_copy')).toThrow();
-    const first = reviewBlock(withEvidence, 'ad_copy', 'heading');
-    expect(() => reviewDocument(first, 'ad_copy')).toThrow();
-    const second = reviewBlock(first, 'ad_copy', 'fact');
-    expect(reviewDocument(second, 'ad_copy').documents.ad_copy?.status).toBe('ready');
-    const edited = editDocument(second, 'ad_copy', [
-      { id: 'heading', kind: 'heading', text: '어떤 컵이 필요하세요?', claimRefs: [] },
+    const approved = approveInsight(withEvidence);
+    approved.documents.ad_copy = { ...approved.documents.ad_copy!, insightRevision: approved.insight.revision };
+    expect(() => reviewDocument(approved, 'ad_copy')).toThrow('광고 3안');
+    const complete = editDocument(approved, 'ad_copy', [
+      { id: 'heading', kind: 'heading', text: '닫는 방법부터', claimRefs: [] },
       { id: 'fact', kind: 'paragraph', text: '뚜껑을 돌려 닫습니다.', claimRefs: [claimId] },
+      { id: 'cta1', kind: 'cta', text: '제품 살펴보기', claimRefs: [] },
+      { id: 'heading2', kind: 'heading', text: '손으로 돌려 닫는 컵', claimRefs: [] },
+      { id: 'body2', kind: 'paragraph', text: '내가 원하는 사용 방식을 먼저 살펴보세요.', claimRefs: [] },
+      { id: 'cta2', kind: 'cta', text: '사용 방식 보기', claimRefs: [] },
+      { id: 'heading3', kind: 'heading', text: '컵 선택의 출발점', claimRefs: [] },
+      { id: 'body3', kind: 'paragraph', text: '언제 쓸지 떠올린 뒤 고르세요.', claimRefs: [] },
+      { id: 'cta3', kind: 'cta', text: '종류 살펴보기', claimRefs: [] },
     ]);
+    expect(reviewDocument(complete, 'ad_copy').documents.ad_copy?.status).toBe('ready');
+    const edited = editDocument(complete, 'ad_copy', complete.documents.ad_copy!.blocks.map(block =>
+      block.id === 'fact' ? { ...block, text: '뚜껑을 2배 빠르게 닫습니다.' } : block));
     expect(edited.documents.ad_copy?.status).toBe('stale');
     expect(edited.documents.ad_copy?.reviewedBlocks).toEqual({});
-    expect(() => reviewDocument(edited, 'ad_copy')).toThrow();
+    expect(() => reviewDocument(edited, 'ad_copy')).toThrow('확인되지 않은 사실');
   });
 
   it('조사 응답의 미확인 추천을 작성 요청문에 근거로 보내지 않는다', () => {
     const p = project();
     p.recommendations = [{ id: 'guess', situation: '출근', reason: '경쟁 제품보다 무조건 우수', claimIds: [], comparisonIds: [], limitation: '' }];
-    expect(prepareContent(p).prompt).not.toContain('무조건 우수');
+    expect(prepareContent(approveInsight(p, true)).prompt).not.toContain('무조건 우수');
   });
   it('공개 사용만 허용한 근거는 외부 AI 작성 요청문에서 제외한다', () => {
     const p = project();
@@ -131,13 +140,13 @@ describe('사실과 프로젝트의 무결성', () => {
       collectedAt: p.createdAt, externalAiAllowed: false, publicationAllowed: true, hash: 'h' }];
     p.claims = [{ id: 'private-claim', projectId: p.id, statement: '내부에서만 확인한 특징', sourceId: 'private-source',
       quote: '내부에서만 확인한 특징', conditions: '', subject: p.name, status: 'supported', reviewedBy: 'human' }];
-    expect(prepareContent(p).prompt).not.toContain('내부에서만 확인한 특징');
+    expect(prepareContent(approveInsight(p, true)).prompt).not.toContain('내부에서만 확인한 특징');
     p.sources[0].externalAiAllowed = true;
-    expect(prepareContent(p).prompt).toContain('내부에서만 확인한 특징');
+    expect(prepareContent(approveInsight(p)).prompt).toContain('내부에서만 확인한 특징');
     p.recommendations = [{ id: 'r', situation: '특징 선택', reason: '경쟁 제품보다 더 좋습니다',
       claimIds: ['private-claim'], comparisonIds: [], limitation: '' }];
     expect(assessRecommendation(p, p.recommendations[0]).label).toBe('경쟁 우위 보류');
-    expect(prepareContent(p).prompt).not.toContain('경쟁 제품보다 더 좋습니다');
+    expect(prepareContent(approveInsight(p)).prompt).not.toContain('경쟁 제품보다 더 좋습니다');
   });
 
   it('구버전 승인 상태를 이어받지 않고 끊어진 질문 관계를 알린다', () => {

@@ -39,7 +39,8 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   await page.screenshot({ path: testInfo.outputPath('research-fictional-fixture.png'), fullPage: true });
   await page.getByText('근거 확인하기', { exact: false }).first().click();
   await expect(page.getByRole('heading', { name: '뚜껑을 돌려 닫는 구조', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: '근거 확인 후 문구 만들기' }).click();
+  await page.getByRole('button', { name: '자료 보완용 구성안으로 진행' }).click();
+  await page.getByRole('link', { name: '작성 요청문으로 가기' }).click();
   await page.getByRole('button', { name: '채널별 작성 요청문 만들기' }).click();
   const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
   const contentId = prompt.match(/requestId: ([\w-]+)/)?.[1];
@@ -80,8 +81,12 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   await page.getByRole('button', { name: '전체 파일 받기', exact: true }).click();
   const download = await downloadPromise;
   const zip = await JSZip.loadAsync(readFileSync((await download.path())!));
-  expect(await zip.file('후기 영상 핵심 문구.txt')?.async('string')).toContain('다시 열어도 남아 있는 촬영 가이드');
-  expect(await zip.file('광고카피.txt')?.async('string')).toContain('닫는 방식부터 살펴보세요');
+  const combined = await JSZip.loadAsync((await zip.file('채널별_전체원고.docx')?.async('uint8array'))!);
+  const contentXml = await combined.file('word/document.xml')?.async('string');
+  expect(contentXml).toContain('다시 열어도 남아 있는 촬영 가이드');
+  expect(contentXml).toContain('닫는 방식부터 살펴보세요');
+  expect(contentXml).not.toContain('촬영 후에만 추가');
+  expect(zip.file('후기 영상 핵심 문구.txt')).toBeNull();
   for (const width of [320, 390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const overflow = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right })).slice(0, 20));
