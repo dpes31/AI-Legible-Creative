@@ -6,10 +6,12 @@ import { type ProviderAdapter, type ProviderResult } from './providers';
 export type Stage = 'research' | 'normalize' | `channel:${string}`;
 export function inputHash(project: Project) {
   return createHash('sha256').update(JSON.stringify({
-    id: project.id, inputRevision: project.inputRevision, evidenceRevision: project.evidenceRevision,
+    id: project.id, inputRevision: project.inputRevision,
     name: project.name, model: project.model, description: project.description, objective: project.objective,
     audience: project.audience, selectedChannels: project.selectedChannels,
-    sources: project.sources.map(s => [s.id, s.hash, s.externalAiAllowed]),
+    // Research results are derived evidence. Only original supplied sources
+    // belong to the immutable input fingerprint for a resumable run.
+    sources: project.sources.filter(s => s.origin !== 'external_response').map(s => [s.id, s.hash, s.externalAiAllowed]),
   })).digest('hex');
 }
 
