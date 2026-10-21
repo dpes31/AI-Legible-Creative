@@ -25,20 +25,27 @@ function markdownResponse(cleaned: string): unknown {
     if (line.startsWith('## ')) { section = line.slice(3).trim(); sections.set(section, []); }
     else if (line.startsWith('- ') && section) sections.get(section)?.push(line.slice(2));
   }
-  const rows = (key: string) => (sections.get(key) || []).map(line => line.split(' | ').map(s => s.trim()));
+  const rows = (key: string, maximum = 8) => (sections.get(key) || []).map(line => {
+    const fields = line.split(' | ').map(s => s.trim());
+    if (fields.length > maximum) throw new ImportError('표 안의 구분 기호가 본문과 섞였습니다. 같은 요청문으로 JSON 응답을 다시 받아 주세요. 원문은 남아 있습니다.');
+    return fields;
+  });
+  const refs = (value = '') => value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
   if (contract === 'alc.content.v1') {
     const documents = channels.flatMap(channel => sections.has(channel) ? [{ channel,
-      blocks: rows(channel).map(([kind, body, refs = '']) => ({ kind, text: body, claimRefs: refs ? refs.split(',').map(s => s.trim()) : [] })),
+      blocks: rows(channel, 3).map(([kind, body, claimRefs = '']) => ({ kind, text: body, claimRefs: refs(claimRefs) })),
     }] : []);
     return { contract, requestId, documents, unresolvedItems: (sections.get('unresolvedItems') || []) };
   }
   const entity = lines.find(line => /^entity\s*:/i.test(line))?.split(':').slice(1).join(':').trim();
   if (!entity) throw new ImportError('응답의 대상 이름을 찾지 못했어요.');
   return { contract, requestId, entity: { name: entity },
-    sources: rows('sources').map(([ref, title, url = '', excerpt = '']) => ({ ref, title, url: url || null, excerpt, sourceType: 'user' })),
-    claims: rows('claims').map(([ref, statement, sourceRef = '', quote = '']) => ({ ref, statement, sourceRef: sourceRef || null, quote, conditions: '', subject: entity })),
-    questions: rows('questions').map(([ref, question]) => ({ ref, text: question, provenance: 'hypothesis', sourceRefs: [] })),
-    comparisons: [], recommendations: [], missingEvidence: (sections.get('missingEvidence') || []),
+    sources: rows('sources', 7).map(([ref, title, url = '', excerpt = '', sourceType = 'user', publisher = '', publishedAt = '']) => ({ ref, title, url: url || null, excerpt, sourceType, publisher: publisher || null, publishedAt: publishedAt || null })),
+    claims: rows('claims', 6).map(([ref, statement, sourceRef = '', quote = '', conditions = '', subject = entity]) => ({ ref, statement, sourceRef: sourceRef || null, quote, conditions, subject })),
+    questions: rows('questions', 4).map(([ref, question, provenance = 'hypothesis', sourceRefs = '']) => ({ ref, text: question, provenance, sourceRefs: refs(sourceRefs) })),
+    comparisons: rows('comparisons', 6).map(([ref, competitor, criterion, own = '', other = '', reason = '']) => ({ ref, competitor, criterion, ownClaimRefs: refs(own), otherClaimRefs: refs(other), comparable: false, verdict: 'unknown', reason })),
+    recommendations: rows('recommendations', 6).map(([ref, situation, reason, claimRefs = '', comparisonRefs = '', limitation = '']) => ({ ref, situation, reason, claimRefs: refs(claimRefs), comparisonRefs: refs(comparisonRefs), limitation })),
+    missingEvidence: (sections.get('missingEvidence') || []),
   };
 }
 
@@ -76,7 +83,7 @@ export function prepareResearch(project: Project): { project: Project; prompt: s
       'comparisons 각 항목: {"ref":"K1","competitor":"대상","criterion":"비교 기준","ownClaimRefs":["C1"],"otherClaimRefs":[],"comparable":false,"verdict":"unknown","reason":"비교 자료 부족"}.',
       'recommendations 각 항목: {"ref":"R1","situation":"고객 상황","reason":"선택 이유","claimRefs":["C1"],"comparisonRefs":["K1"],"limitation":"적용되지 않는 경우"}.',
       '근거가 없으면 배열을 비워 두고 missingEvidence에 필요한 자료를 적으세요. 조사 결과의 verified/confidence 표시는 검증 완료가 아닙니다.',
-      'JSON을 만들 수 없는 경우만 정확한 Markdown 형식으로 보내세요: # alc.research.v1 / requestId: 위 ID / entity: 대상명 / ## sources 아래 - S1 | 자료명 | URL 또는 빈칸 | 실제 원문 / ## claims 아래 - C1 | 주장 | S1 | 실제 인용 / ## questions 아래 - Q1 | 질문 / ## missingEvidence 아래 - 필요한 자료. 각 항목은 새 줄입니다.',
+      'JSON을 만들 수 없는 경우만 정확한 Markdown 형식으로 보내세요: # alc.research.v1 / requestId: 위 ID / entity: 대상명 / ## sources 아래 - S1 | 자료명 | URL 또는 빈칸 | 실제 원문 | user | 발행 주체 또는 빈칸 | 발행일 또는 빈칸 / ## claims 아래 - C1 | 주장 | S1 | 실제 인용 | 조건 | 대상 / ## questions 아래 - Q1 | 질문 | hypothesis | S1 / ## comparisons 아래 - K1 | 경쟁 대상 | 기준 | 자사 주장 ref | 경쟁 주장 ref | 확인할 내용 / ## recommendations 아래 - R1 | 고객 상황 | 선택 이유 | C1 | K1 | 한계 / ## missingEvidence 아래 - 필요한 자료. 각 항목은 새 줄이며 여러 ref는 쉼표로 구분합니다. 문장 안에 구분 기호를 넣지 마세요.',
     ].join('\n\n'),
   };
 }
@@ -161,6 +168,9 @@ export function verifyClaim(project: Project, claimId: string): Project {
   }
   if (claim.target === 'unresolved' || (claim.target === 'competitor' && (!claim.subject || claim.subject === project.name))) {
     throw new ImportError('이 주장이 어느 제품에 관한 것인지 먼저 확인해 주세요.');
+  }
+  if (claim.target !== 'competitor' && !normalize(claim.subject).includes(normalize(project.name))) {
+    throw new ImportError('현재 대상과 다른 이름의 주장입니다. 조사 응답에서 정확한 대상명을 확인해 주세요.');
   }
   const claims = project.claims.map(c => c.id === claimId ? { ...c, status: 'supported' as const, reviewedBy: 'human' as const, review: { sourceHash: source.hash, quote: c.quote, at: new Date().toISOString(), method: 'human' as const } } : c);
   return { ...project, claims, evidenceRevision: project.evidenceRevision + 1,

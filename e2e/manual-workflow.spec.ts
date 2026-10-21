@@ -66,7 +66,8 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   expect(await zip.file('광고카피.txt')?.async('string')).toContain('닫는 방식부터 살펴보세요');
   for (const width of [320, 390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    const overflow = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right })).slice(0, 20));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), JSON.stringify(overflow)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath(`results-${width}.png`), fullPage: true });
   }
 });
@@ -84,7 +85,8 @@ test('320~1440px 입력과 모드 변경에서 내용·선택을 보존한다', 
     await expect(name).toHaveValue('이름이 아주 긴 가상 브랜드 보온컵');
     await expect(page.getByText('아직 자동 실행을 연결하지 않았습니다.', { exact: false })).toBeVisible();
     await page.getByLabel('외부 AI로 직접', { exact: false }).check();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    const overflow = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => ({ tag: el.tagName, className: el.className, right: el.getBoundingClientRect().right })).slice(0, 20));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), JSON.stringify(overflow)).toBeLessThanOrEqual(width);
     const size = await page.getByRole('button', { name: '브랜드 분석 시작' }).boundingBox();
     expect(size?.height).toBeGreaterThanOrEqual(44);
     await page.screenshot({ path: testInfo.outputPath(`brief-${width}.png`), fullPage: true });

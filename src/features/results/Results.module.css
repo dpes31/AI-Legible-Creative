@@ -1,4 +1,5 @@
 .heading { display:flex; align-items:flex-end; gap:24px; justify-content:space-between; padding:30px 0; }
+.heading > div { min-width:0; }
 .heading h1 { font-size:clamp(28px,3.5vw,42px); font-weight:720; margin-top:10px; }
 .heading p { font-size:14px; color:var(--muted); margin:0; }
 .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:16px 0 24px; }
@@ -45,12 +46,13 @@
   .heading { align-items:flex-start; }
 }
 @media (max-width:700px) {
+  .heading { flex-direction:column; gap:16px; }
   .channels { display:none; }
   .mobileChannel { display:block; }
   .toolbar { gap:8px; }
   .toolbar :global(.button) { flex:1; font-size:13px; }
-  .download { margin-left:0; }
-  .download[open] > div { right:auto; left:0; }
+  .download { margin-left:0; flex-basis:100%; min-width:0; }
+  .download[open] > div { position:static; width:100%; margin-top:8px; }
   .editor { padding:20px 16px; }
   .evidence > section, .evidence > details { padding:20px; }
   .exchange { padding:16px; }

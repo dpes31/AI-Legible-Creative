@@ -86,3 +86,5 @@
   .modeChoices { grid-template-columns:1fr; }
   .modeChoices small { display:inline; margin-left:10px; }
 }
+
+.fields { border:0; padding:0; margin:0; min-width:0; }

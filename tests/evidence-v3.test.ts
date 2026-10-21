@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newProject, type ChannelDocument, type Project } from '../src/domain/schema';
-import { applyDocumentProposal, importContent, importResearch, prepareContent, prepareResearch, updateDocumentText, validateDocument } from '../src/domain/workflow';
+import { applyDocumentProposal, importContent, importResearch, prepareContent, prepareResearch, updateDocumentText, validateDocument, verifyClaim } from '../src/domain/workflow';
 import { quantities } from '../src/domain/validation/document';
 import { buildStrategy, comparisonAssessment } from '../src/domain/analysis/strategy';
 
@@ -67,4 +67,31 @@ describe('근거와 결과의 변경 안전성', () => {
     expect(result.sources[0].publishedAt).toBeNull();
     expect(result.missingEvidence).toEqual(['자료 부족']);
   });
+});
+
+
+it('다른 대상의 주장을 자사 근거로 확인할 수 없다', () => {
+  const p = grounded(); p.claims[0].subject = '다른 회사 제품';
+  expect(() => verifyClaim(p, 'c')).toThrow();
+});
+it('Markdown 조사에서 조건과 질문 출처를 보존하고 모호한 구분 기호를 거절한다', () => {
+  const p = prepareResearch(base()).project;
+  const raw = `# alc.research.v1
+requestId: ${p.manualResearchRequestId}
+entity: ${p.name}
+## sources
+- S1 | 허구 시험 |  | 실내 시험 용량 1L | test | 가상 기관 | 
+## claims
+- C1 | 용량 1L | S1 | 실내 시험 용량 1L | 실내 시험 | ${p.name}
+## questions
+- Q1 | 용량은 얼마인가요? | hypothesis | S1
+## recommendations
+- R1 | 출근길 | 용량 확인 | C1 |  | 실내 시험 조건
+## missingEvidence
+- 경쟁 자료 필요`;
+  const result = importResearch(p, raw);
+  expect(result.claims[0].conditions).toBe('실내 시험');
+  expect(result.questions[0].sourceIds).toEqual([result.sources[0].id]);
+  expect(result.recommendations[0].limitation).toBe('실내 시험 조건');
+  expect(() => importResearch(p, raw.replace('용량 확인 | C1', '용량 | 확인 | C1'))).toThrow();
 });

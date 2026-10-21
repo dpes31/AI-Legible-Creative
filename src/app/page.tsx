@@ -35,6 +35,7 @@ export default function Home() {
   const toggle = (channel: Channel) => setSelectedChannels(current => current.includes(channel) ? current.filter(x => x !== channel) : [...current, channel]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (loading || pending) return;
     if (!name.trim() || (!audienceUndecided && !audience.trim()) || !selectedChannels.length) {
       setMessage('대상, 고객 상황 또는 ‘아직 정하지 않았어요’, 결과물 한 가지 이상을 선택해 주세요.'); return;
     }
@@ -81,6 +82,7 @@ export default function Home() {
       </section>
       <form className={`card ${styles.form}`} onSubmit={submit} aria-labelledby="form-heading">
         <div className={styles.formHeading}><div><p className="eyebrow">{editing ? '입력 수정' : '새 작업'}</p><h2 id="form-heading">{editing ? '필요한 정보만 바꾸세요.' : '세 가지만 알려 주세요.'}</h2></div><span className={styles.formMark} aria-hidden="true">↗</span></div>
+        <fieldset disabled={loading || pending} className={styles.fields}>
         <div className={styles.group}>
           <div className="field"><label htmlFor="entity"><span className={styles.number}>01</span>무엇을 알리고 싶으신가요?</label>
             <input id="entity" value={name} onChange={event => setName(event.target.value)} placeholder="브랜드·제품·서비스 이름" required /></div>
@@ -122,8 +124,9 @@ export default function Home() {
         {mode === 'automatic' && <p role="status" className={styles.fieldHelp}>아직 자동 실행을 연결하지 않았습니다. 입력은 보관하고, 다음 화면에서 외부 AI로 직접 진행할 수 있어요.</p>}
       </fieldset>
       {message && <p role="alert" className="alert">{message}</p>}
-      <button className={`button ${styles.submit}`} type="submit" disabled={pending}>{pending ? '저장 중…' : editing ? '바뀐 입력 저장하기' : '브랜드 분석 시작'}<span aria-hidden="true">→</span></button>
+      <button className={`button ${styles.submit}`} type="submit" disabled={loading || pending}>{pending ? '저장 중…' : editing ? '바뀐 입력 저장하기' : '브랜드 분석 시작'}<span aria-hidden="true">→</span></button>
       <p className={styles.submitNote}>아는 만큼만 적어 주세요. 자료는 다음 화면에서도 더할 수 있어요.</p>
+      </fieldset>
     </form>
     </div>
     <section className={styles.deliverables} aria-labelledby="deliverables-heading"><div><p className="eyebrow">필요한 채널에 바로</p><h2 id="deliverables-heading">하나의 분석, 여섯 가지 문구</h2><p className="muted small">각각 수정하고, 필요한 문구만 복사하세요.</p></div>
