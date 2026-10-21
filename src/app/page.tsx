@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { channels, channelNames, newProject, type Channel, type Objective, type ProductCategory } from '@/domain/schema';
-import { listBrandProfiles, loadBriefDraft, moveBriefDraft, saveBrandProfile, saveBriefDraft, type BriefDraft } from '@/data/repository';
+import { listBrandProfiles, loadBriefDraft, moveBriefDraft, preserveConflictDraft, RevisionConflict, saveBrandProfile, saveBriefDraft, type BriefDraft } from '@/data/repository';
 import { newBrandProfile, type BrandProfile } from '@/domain/portfolio';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 import styles from '@/features/brief/BriefStart.module.css';
@@ -36,6 +36,9 @@ export default function Home() {
   const draftId = useRef(crypto.randomUUID());
   const draftQueue = useRef<Promise<void>>(Promise.resolve());
   const draftFailed = useRef(false);
+  const draftError = useRef('');
+  const currentProject = useRef(project);
+  useEffect(() => { currentProject.current = project; }, [project]);
 
   useEffect(() => {
     if (loading) return;
@@ -78,7 +81,13 @@ export default function Home() {
         setDraftState('saved');
       } catch (cause) {
         draftFailed.current = true; setDraftState('error');
-        setMessage(cause instanceof Error ? cause.message : '입력을 저장하지 못했어요. 현재 내용을 복사해 보관해 주세요.');
+        const active = currentProject.current;
+        if (cause instanceof RevisionConflict && cause.recoveryId && active && key === `project:${active.id}`) {
+          try { await preserveConflictDraft(cause.recoveryId, { ...active, ...input }); }
+          catch { draftError.current = '충돌한 입력을 보관하지 못했어요. 현재 내용을 복사해 주세요.'; setMessage(draftError.current); return; }
+        }
+        draftError.current = cause instanceof Error ? cause.message : '입력을 저장하지 못했어요. 현재 내용을 복사해 보관해 주세요.';
+        setMessage(draftError.current);
       }
     });
   }, [draftReady, draftKey, name, kind, model, brandId, brandName, category, description, officialUrl, objective, audience, audienceUndecided, selectedChannels, mode]);
@@ -98,7 +107,7 @@ export default function Home() {
     setPending(true); setMessage('');
     try {
       await draftQueue.current;
-      if (draftFailed.current) throw new Error('입력 저장에 실패했습니다. 현재 내용을 보관한 뒤 다시 시도해 주세요.');
+      if (draftFailed.current) throw new Error(draftError.current || '입력을 저장하지 못했어요. 현재 내용을 보관해 주세요.');
       setDraftReady(false);
       if (!brandId && brandName.trim() && brands.some(item => item.name === brandName.trim())) {
         throw new Error('같은 이름의 브랜드가 이미 있습니다. 기존 브랜드를 선택하거나 정확한 이름을 확인해 주세요.');
