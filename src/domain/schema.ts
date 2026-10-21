@@ -142,7 +142,11 @@ export const researchImportSchema = z.object({
   comparisons: z.array(z.object({
     ref: id, competitor: shortText, criterion: shortText,
     ownClaimRefs: z.array(id), otherClaimRefs: z.array(id), comparable: z.boolean(),
-    verdict: z.enum(['advantage', 'common', 'unknown', 'weakness']), reason: z.string().max(3000),
+    // External AI often uses these two equivalent labels. Its verdict is still
+    // discarded until both sides' original evidence and conditions are reviewed.
+    verdict: z.enum(['advantage', 'common', 'unknown', 'weakness', 'own_advantage', 'competitor_advantage'])
+      .transform(value => value === 'own_advantage' ? 'advantage' as const : value === 'competitor_advantage' ? 'weakness' as const : value),
+    reason: z.string().max(3000),
   })),
   recommendations: z.array(z.object({
     ref: id, situation: shortText, reason: shortText, claimRefs: z.array(id),

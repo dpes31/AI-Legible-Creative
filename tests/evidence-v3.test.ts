@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newProject, type ChannelDocument, type Project } from '../src/domain/schema';
-import { applyDocumentProposal, importContent, importResearch, prepareContent, prepareResearch, updateDocumentText, validateDocument, verifyClaim } from '../src/domain/workflow';
+import { EntityMismatch, applyDocumentProposal, importContent, importResearch, prepareContent, prepareResearch, updateDocumentText, validateDocument, verifyClaim } from '../src/domain/workflow';
 import { quantities } from '../src/domain/validation/document';
 import { buildStrategy, comparisonAssessment } from '../src/domain/analysis/strategy';
 
@@ -94,4 +94,32 @@ entity: ${p.name}
   expect(result.questions[0].sourceIds).toEqual([result.sources[0].id]);
   expect(result.recommendations[0].limitation).toBe('실내 시험 조건');
   expect(() => importResearch(p, raw.replace('용량 확인 | C1', '용량 | 확인 | C1'))).toThrow();
+});
+
+it('실제 수동 응답처럼 제품명에 별칭이 빠지고 우위 표기가 달라도 명시적 확인 후 미검증으로 가져온다', () => {
+  const started = prepareResearch(newProject({ name: '코웨이 비렉스 트리플체어2 슬림', kind: 'product', description: '', officialUrl: '', objective: 'feature', audience: '', audienceUndecided: true, selectedChannels: ['ad_copy'], mode: 'manual' })).project;
+  const response = JSON.stringify({
+    contract: 'alc.research.v1', requestId: started.manualResearchRequestId,
+    entity: { name: '코웨이 트리플체어2 슬림' },
+    sources: [
+      { ref: 'S1', title: '사용자 제공 공식몰 문구', url: 'https://example.org/own', excerpt: '가로 폭 680mm (세웠을 때 기준)', sourceType: 'official' },
+      { ref: 'S2', title: '사용자 제공 경쟁 제품 문구', url: 'https://example.org/other', excerpt: '가로 폭 780mm (세웠을 때 기준)', sourceType: 'official' },
+    ],
+    claims: [
+      { ref: 'C1', statement: '가로 폭 680mm', sourceRef: 'S1', quote: '가로 폭 680mm', conditions: '세웠을 때', subject: '코웨이 트리플체어2 슬림' },
+      { ref: 'C2', statement: '가로 폭 780mm', sourceRef: 'S2', quote: '가로 폭 780cm', conditions: '세웠을 때', subject: '경쟁 제품' },
+    ], questions: [],
+    comparisons: [
+      { ref: 'K1', competitor: '경쟁 제품', criterion: '폭', ownClaimRefs: ['C1'], otherClaimRefs: ['C2'], comparable: true, verdict: 'own_advantage', reason: '외부 AI의 비교 제안' },
+      { ref: 'K2', competitor: '경쟁 제품', criterion: '다른 기능', ownClaimRefs: ['C1'], otherClaimRefs: ['C2'], comparable: true, verdict: 'competitor_advantage', reason: '외부 AI의 비교 제안' },
+    ], recommendations: [], missingEvidence: ['원문 확인 필요'],
+  });
+  expect(() => importResearch(started, response)).toThrow(EntityMismatch);
+  const imported = importResearch(started, response, true);
+  expect(imported.sources).toHaveLength(2);
+  expect(imported.claims.map(c => c.status)).toEqual(['unreviewed', 'unreviewed']);
+  expect(imported.comparisons.every(c => !c.comparable && c.verdict === 'unknown')).toBe(true);
+  expect(imported.migrationNote).toContain('같은 대상으로 확인한 조사 이름');
+  expect(imported.missingEvidence.join(' ')).toContain('인용문이 일치하지 않음: C2');
+  expect(imported.manualDrafts.research).toBe(started.manualDrafts.research);
 });

@@ -12,6 +12,11 @@ export { fingerprint } from './text';
 export { validateDocument } from './validation/document';
 
 export class ImportError extends Error {}
+export class EntityMismatch extends ImportError {
+  constructor(readonly expected: string, readonly received: string) {
+    super(`대상 이름이 달라요. 현재 작업: ${expected} / 조사 응답: ${received}. 같은 제품인지 확인해 주세요.`);
+  }
+}
 
 function markdownResponse(cleaned: string): unknown {
   const lines = cleaned.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -93,7 +98,7 @@ function uniqueRefs(items: { ref: string }[]) {
   if (new Set(refs).size !== refs.length) throw new ImportError('응답의 자료 번호가 중복됩니다. 조사 요청문으로 다시 받아 주세요.');
 }
 
-export function importResearch(project: Project, response: string): Project {
+export function importResearch(project: Project, response: string, confirmSameEntity = false): Project {
   const parsed = researchImportSchema.safeParse(parseResponse(response));
   if (!parsed.success) throw new ImportError(`조사 응답에서 필요한 항목을 찾지 못했어요: ${parsed.error.issues[0]?.path.join('.') || '형식'}`);
   const data: ResearchImport = parsed.data;
@@ -102,7 +107,9 @@ export function importResearch(project: Project, response: string): Project {
   if (priorReceipt) throw new ImportError('이미 가져온 요청에 다른 응답이 들어왔습니다. 새 조사 요청문을 만들어 주세요.');
   if (data.sources.length > researchLimits.sources || data.questions.length > researchLimits.questions || new Set(data.comparisons.map(c => c.competitor)).size > researchLimits.competitors) throw new ImportError('조사 범위를 넘었습니다. 자료 20개·질문 12개·경쟁 후보 3개 이내로 정리해 주세요. 원문은 그대로 남아 있습니다.');
   if (!project.manualResearchRequestId || data.requestId !== project.manualResearchRequestId) throw new ImportError('현재 프로젝트의 조사 응답이 아닙니다. 요청 ID를 확인해 주세요.');
-  if (normalize(data.entity.name).toLowerCase() !== normalize(project.name).toLowerCase()) throw new ImportError('응답의 제품명이 현재 프로젝트와 다릅니다.');
+  if (normalize(data.entity.name).toLowerCase() !== normalize(project.name).toLowerCase() && !confirmSameEntity) {
+    throw new EntityMismatch(project.name, data.entity.name);
+  }
   if (!data.sources.length && !data.claims.length && !data.recommendations.length) throw new ImportError('응답에 조사 자료가 없습니다. 공식 자료나 제품 설명을 추가해 주세요.');
   [data.sources, data.claims, data.questions, data.comparisons, data.recommendations].forEach(uniqueRefs);
   const now = new Date().toISOString();
@@ -129,6 +136,10 @@ export function importResearch(project: Project, response: string): Project {
       target: data.comparisons.some(c => c.otherClaimRefs.includes(x.ref)) ? 'competitor' : 'own',
     };
   });
+  const unmatchedQuotes = data.claims.filter(x => {
+    const source = data.sources.find(s => s.ref === x.sourceRef);
+    return source && x.quote && !normalize(source.excerpt).includes(normalize(x.quote));
+  }).map(x => `원문 발췌와 인용문이 일치하지 않음: ${x.ref} · ${x.statement}`);
   const questions = data.questions.map(x => ({
     id: crypto.randomUUID(), text: x.text, provenance: x.provenance,
     sourceIds: x.sourceRefs.map(ref => requireRef(sourceIds, ref)),
@@ -149,11 +160,14 @@ export function importResearch(project: Project, response: string): Project {
   const documents = Object.fromEntries(Object.entries(project.documents).map(([channel, document]) => [channel, document && { ...document, status: 'stale' }]));
   return {
     ...project, sources: [...project.sources, ...sources], claims: [...project.claims, ...claims],
-    questions, comparisons, recommendations, missingEvidence: data.missingEvidence,
+    questions, comparisons, recommendations, missingEvidence: [...data.missingEvidence, ...unmatchedQuotes],
     importReceipts: [...project.importReceipts, { requestId: data.requestId, contract: data.contract, responseHash: fingerprint(response), at: now }],
     documents: documents as Project['documents'], evidenceRevision: project.evidenceRevision + 1,
     manualResearchRequestId: null, manualContentRequestId: null,
-    migrationNote: data.missingEvidence.length ? `추가 확인: ${data.missingEvidence.join(' · ')}` : project.migrationNote,
+    migrationNote: [
+      confirmSameEntity ? `사용자가 같은 대상으로 확인한 조사 이름: ${data.entity.name} (현재 작업: ${project.name}). 이 확인은 출처·주장의 검증을 뜻하지 않습니다.` : '',
+      data.missingEvidence.length || unmatchedQuotes.length ? `추가 확인: ${[...data.missingEvidence, ...unmatchedQuotes].join(' · ')}` : '',
+    ].filter(Boolean).join('\n') || project.migrationNote,
   };
 }
 

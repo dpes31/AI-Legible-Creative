@@ -120,3 +120,40 @@ test('두 창에서 겹친 수정도 새로고침 뒤 초안으로 남는다', a
   await page.getByText('자료 더하기 · 결과물 선택', { exact: false }).click();
   await expect(page.getByLabel('한 줄 설명 또는 강조하고 싶은 특징')).toHaveValue('첫 창에서 저장한 설명');
 });
+
+test('실제 제품 응답의 이름 차이와 우위 표기를 버튼 옆에서 안내하고 확인 후 가져온다', async ({ page }, testInfo) => {
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByLabel('무엇을 알리고 싶으신가요?').fill('코웨이 비렉스 트리플체어2 슬림');
+  await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
+  await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
+  const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
+  const requestId = prompt.match(/요청 ID: ([\w-]+)/)?.[1];
+  expect(requestId).toBeTruthy();
+  const response = JSON.stringify({
+    contract: 'alc.research.v1', requestId, entity: { name: '코웨이 트리플체어2 슬림' },
+    sources: [
+      { ref: 'S1', title: '사용자가 제공한 공식몰 발췌', url: 'https://example.org/own', excerpt: '가로 폭 680mm', sourceType: 'official' },
+      { ref: 'S2', title: '사용자가 제공한 경쟁 제품 발췌', url: 'https://example.org/other', excerpt: '가로 폭 780mm', sourceType: 'official' },
+    ], claims: [
+      { ref: 'C1', statement: '가로 폭 680mm', sourceRef: 'S1', quote: '가로 폭 680mm', conditions: '세웠을 때', subject: '코웨이 트리플체어2 슬림' },
+      { ref: 'C2', statement: '가로 폭 780mm', sourceRef: 'S2', quote: '가로 폭 780cm', conditions: '세웠을 때', subject: '경쟁 제품' },
+    ], questions: [], comparisons: [
+      { ref: 'K1', competitor: '경쟁 제품', criterion: '가로 폭', ownClaimRefs: ['C1'], otherClaimRefs: ['C2'], comparable: true, verdict: 'own_advantage', reason: '폭 비교 제안' },
+      { ref: 'K2', competitor: '경쟁 제품', criterion: '안마 범위', ownClaimRefs: ['C1'], otherClaimRefs: ['C2'], comparable: true, verdict: 'competitor_advantage', reason: '안마 비교 제안' },
+    ], recommendations: [], missingEvidence: ['실제 원문과 모델 확인 필요'],
+  });
+  await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(response);
+  await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
+  await expect(page.locator('#research-import-error')).toContainText('현재 작업: 코웨이 비렉스 트리플체어2 슬림');
+  await expect(page.locator('#research-import-error')).toContainText('조사 응답: 코웨이 트리플체어2 슬림');
+  await expect(page.getByLabel('AI에서 받은 조사 결과 붙여넣기')).toHaveValue(response);
+  await page.getByRole('button', { name: '같은 제품임을 확인하고 가져오기' }).click();
+  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+  await expect(page.getByText('원문 확인이 필요한 주장이 2개 있습니다.', { exact: false })).toBeVisible();
+  await expect(page.getByText('인용문이 일치하지 않음: C2', { exact: false }).first()).toBeVisible();
+  await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
+  await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
+  await page.screenshot({ path: testInfo.outputPath('actual-response-alias-mobile.png'), fullPage: true });
+});
