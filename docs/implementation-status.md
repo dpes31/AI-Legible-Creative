@@ -69,3 +69,5 @@
 - 외부 AI의 두 별도 표기를 입력 형식으로만 허용. 비교 우위와 검증 상태는 계속 `unknown`·미확인으로 저장. 대상 이름이 다르면 실제 두 이름을 버튼 옆에 보여주고 사용자가 같은 제품이라고 확인한 경우에만 가져옴. 인용문이 제공된 원문 발췌에 없으면 누락 근거에 기록. 오류 위치로 초점을 옮겨 모바일과 스크린리더에 알림. 원문 응답을 편집하거나 버리지 않음.
 - 사용자가 제공한 제품 성능·가격·리뷰·경쟁 우위는 이번 버그 재현용 입력이며 출처를 실제 열어 검증한 사실이 아님. 특히 C5의 `150 ㅇ` 인용은 제공 발췌의 `150°`와 다르고, C7의 제품 기능 부재 주장도 해당 인용만으로 확정할 수 없음. 가져오기 성공이 해당 주장의 의미 검증을 뜻하지 않음.
 - 로컬 lint/typecheck/단위 31개/build 통과. 실제 iPhone 원격 Preview 및 새 Chromium/WebKit E2E는 새 SHA 배포·CI 이후 확인할 것. API 비용 없음, main/운영 변경 없음.
+
+- 수정 기능 SHA `df6ad93567a66ce1da2ed47629468a3f6b41d9b5`의 [CI run 39586641806](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39586641806): npm ci, lint, typecheck, 단위 31개, Chromium·WebKit E2E 8개, build 전부 통과. 시뮬레이션에는 실제 사용자 응답의 이름 차이·두 우위 표기·불일치 인용 구조를 사용했으며 실제 공개 링크 내용의 사실 검증은 실행하지 않음. `review-evidence` 스크린샷에서 모바일 분석 요약·비교 미확인·원문 불일치 표시 확인. Preview `https://ai-legible-creative-64nm8aexq-dpes31s-projects.vercel.app/` READY, 보호된 접근의 실기기 동작은 사용자 측 재확인 대상.

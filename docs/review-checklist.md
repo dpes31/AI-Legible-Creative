@@ -58,3 +58,5 @@
 
 - T07/T09: 사용자가 제공한 외부 조사 응답의 `own_advantage`·`competitor_advantage`를 비교 입력 형식으로 수용하되 우위로 승인하지 않음. 다른 대상명은 명시적 확인 요구. 원문 발췌와 맞지 않는 인용은 추가 확인에 표시. 붙여넣기 원문 보존.
 - T24: 390px 브라우저에서 거절 사유를 ‘조사 내용 가져오기’ 바로 옆에 표시하고 초점을 안내로 이동. 확인 뒤 분석 요약·비교 미확인 상태를 검사하도록 E2E 추가. 실기기 검수는 별도.
+
+- 수정 기능 SHA `df6ad93567a66ce1da2ed47629468a3f6b41d9b5`의 [CI run 39586641806](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39586641806): npm ci, lint, typecheck, 단위 31개, Chromium·WebKit E2E 8개, build 전부 통과. 시뮬레이션에는 실제 사용자 응답의 이름 차이·두 우위 표기·불일치 인용 구조를 사용했으며 실제 공개 링크 내용의 사실 검증은 실행하지 않음. `review-evidence` 스크린샷에서 모바일 분석 요약·비교 미확인·원문 불일치 표시 확인. Preview `https://ai-legible-creative-64nm8aexq-dpes31s-projects.vercel.app/` READY, 보호된 접근의 실기기 동작은 사용자 측 재확인 대상.
