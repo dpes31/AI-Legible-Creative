@@ -8,6 +8,7 @@ import { AnalysisSummary } from '@/features/review/AnalysisSummary';
 import { ComparisonReview } from '@/features/review/ComparisonReview';
 import { SourceForm } from '@/features/review/SourceForm';
 import { ManualExchange } from '@/features/manual/ManualExchange';
+import { approveInsight, insightCurrent, reviseInsight } from '@/domain/insight';
 import styles from '@/features/review/Review.module.css';
 
 export default function ReviewPage() {
@@ -31,7 +32,25 @@ export default function ReviewPage() {
     {notice && <p className="small muted" role="status">{notice}</p>}
     {hasAnalysis ? <>
       <AnalysisSummary project={project} />
-      <div className={styles.next}><p>{unreviewed ? `원문 확인이 필요한 주장이 ${unreviewed}개 있습니다. 미확인 사실을 제외하고 문구를 만들 수도 있어요.` : '확인한 사실을 채널에 맞게 다듬을 수 있습니다.'}</p><Link href="/results" className="button">근거 확인 후 문구 만들기 <span aria-hidden="true">→</span></Link></div>
+      <section className="card" aria-labelledby="insight-review-heading"><h2 id="insight-review-heading">핵심 인사이트 검수</h2>
+        <p className="small muted">질문·소구 순서·채널별 방향을 바꾸고 싶다면 적어 주세요. 새로운 기능이나 수치는 근거를 확인한 뒤에만 본문에 넣습니다.</p>
+        <div className="field"><label htmlFor="insight-feedback">수정할 방향</label><textarea id="insight-feedback" value={project.insight.feedback}
+          onChange={event => update(reviseInsight(project, event.target.value))} placeholder="예: 허리 지지보다 공간 활용을 먼저 설명해 주세요. 등·허리 안마는 일반형에만 해당한다고 밝혀 주세요." /></div>
+        {/(?:\d\s*(?:%|mm|cm|원|배)|인증|유일|최고|더\s*좋)/.test(project.insight.feedback) &&
+          <p className="small muted">새로운 수치·효능·우위가 의견에 있다면 근거 후보로만 보관합니다. 확인한 주장에 없는 내용은 요청문에서 사실로 쓰지 않습니다.</p>}
+        <div className="row"><button className="button" type="button" onClick={() => {
+          try { update(approveInsight(project)); setError(''); setNotice('작성 방향을 확인했습니다. 미확인 사실은 계속 제외합니다.'); }
+          catch (cause) { setError(cause instanceof Error ? cause.message : '근거를 확인해 주세요.'); }
+        }}>이 방향으로 작성</button>
+        <button className="button secondary" type="button" onClick={() => {
+          try { update(approveInsight(project, true)); setError(''); setNotice('자료 보완용 구성안으로 표시합니다. 최종 원고로 자동 승인되지 않습니다.'); }
+          catch (cause) { setError(cause instanceof Error ? cause.message : '입력을 확인해 주세요.'); }
+        }}>자료 보완용 구성안으로 진행</button></div>
+        {insightCurrent(project) && <p role="status" className="small">승인한 방향 {project.insight.revision} · 입력 {project.insight.inputRevision} · 근거 {project.insight.evidenceRevision} 버전</p>}
+      </section>
+      <div className={styles.next}><p>{unreviewed ? `원문 확인이 필요한 주장이 ${unreviewed}개 있습니다. 미확인 사실은 제외하고 작성합니다.` : '확인한 사실을 채널에 맞게 다듬을 수 있습니다.'}</p>
+        {insightCurrent(project) ? <Link href="/results" className="button">작성 요청문으로 가기 <span aria-hidden="true">→</span></Link>
+          : <p className="small">위에서 인사이트 방향을 확인하면 작성 요청문을 만들 수 있습니다.</p>}</div>
     </> : <section className="card"><span className="eyebrow">첫 번째 요청 · 조사</span><h2>어떤 점을 알리면 좋을지 찾아봅니다.</h2><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></section>}
     <details className={styles.fold} id="evidence"><summary>근거 확인하기 <span>주장 {project.claims.length}개 · 원문 확인 필요 {unreviewed}개</span></summary>
       {!project.claims.length && <p className="muted">조사 응답을 가져오면 문장별 출처와 조건을 함께 볼 수 있습니다.</p>}
@@ -63,6 +82,8 @@ export default function ReviewPage() {
     </details>
     <details className={styles.fold}><summary>자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>
     {hasAnalysis && <details className={styles.fold} open={!!project.manualResearchRequestId}><summary>조사 보완하기 <span>새 자료나 질문이 있을 때</span></summary><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></details>}
-    {!hasAnalysis && <div className={styles.next}><p>자료가 부족하면 기능·수치 없는 구성안부터 만들 수 있습니다.</p><Link href="/results" className="button secondary">자료 보완용 구성안 만들기</Link></div>}
+    {!hasAnalysis && <div className={styles.next}><p>자료가 부족하면 기능·수치 없는 구성안부터 만들 수 있습니다.</p>
+      <button type="button" className="button secondary" onClick={() => update(approveInsight(project, true))}>자료 보완용 구성안으로 진행</button>
+      {insightCurrent(project) && <Link href="/results" className="button secondary">작성 요청문으로 가기</Link>}</div>}
   </>;
 }

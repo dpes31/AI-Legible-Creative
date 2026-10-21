@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { channels, channelNames, newProject, type Channel, type Objective } from '@/domain/schema';
-import { loadBriefDraft, moveBriefDraft, saveBriefDraft, type BriefDraft } from '@/data/repository';
+import { channels, channelNames, newProject, type Channel, type Objective, type ProductCategory } from '@/domain/schema';
+import { listBrandProfiles, loadBriefDraft, moveBriefDraft, saveBrandProfile, saveBriefDraft, type BriefDraft } from '@/data/repository';
+import { newBrandProfile, type BrandProfile } from '@/domain/portfolio';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 import styles from '@/features/brief/BriefStart.module.css';
 
@@ -14,6 +15,10 @@ export default function Home() {
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'brand' | 'product' | 'service'>('product');
   const [model, setModel] = useState('');
+  const [brandId, setBrandId] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState('');
+  const [category, setCategory] = useState<ProductCategory>('unknown');
+  const [brands, setBrands] = useState<BrandProfile[]>([]);
   const [description, setDescription] = useState('');
   const [objective, setObjective] = useState<Objective>('sales');
   const [audience, setAudience] = useState('');
@@ -34,6 +39,7 @@ export default function Home() {
 
   useEffect(() => {
     if (loading) return;
+    void listBrandProfiles().then(setBrands).catch(() => setMessage('브랜드 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'));
     let cancelled = false;
     const preferred = localStorage.getItem('alc-brief-focus-v1');
     const activeProject = project;
@@ -45,6 +51,7 @@ export default function Home() {
         const input = draft?.input ?? (key !== 'new' ? activeProject : null);
         if (input) {
           setName(input.name); setKind(input.kind); setModel(input.model); setDescription(input.description);
+          setBrandId(input.brandId ?? null); setBrandName(input.brandName ?? ''); setCategory(input.category ?? 'unknown');
           setObjective(input.objective); setAudience(input.audience); setAudienceUndecided(input.audienceUndecided);
           setOfficialUrl(input.officialUrl); setSelectedChannels(input.selectedChannels); setMode(input.mode);
         }
@@ -58,7 +65,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!draftReady) return;
-    const input: BriefDraft['input'] = { name, kind, model, description, officialUrl, objective, audience,
+    const input: BriefDraft['input'] = { name, kind, model, brandId, brandName, category, description, officialUrl, objective, audience,
       audienceUndecided, selectedChannels, mode };
     const key = draftKey; const id = draftId.current;
     draftFailed.current = false;
@@ -74,7 +81,7 @@ export default function Home() {
         setMessage(cause instanceof Error ? cause.message : '입력을 저장하지 못했어요. 현재 내용을 복사해 보관해 주세요.');
       }
     });
-  }, [draftReady, draftKey, name, kind, model, description, officialUrl, objective, audience, audienceUndecided, selectedChannels, mode]);
+  }, [draftReady, draftKey, name, kind, model, brandId, brandName, category, description, officialUrl, objective, audience, audienceUndecided, selectedChannels, mode]);
 
   const editCurrent = () => {
     if (!project) return;
@@ -92,21 +99,37 @@ export default function Home() {
     try {
       await draftQueue.current;
       if (draftFailed.current) throw new Error('입력 저장에 실패했습니다. 현재 내용을 보관한 뒤 다시 시도해 주세요.');
-      const input = { name: name.trim(), kind, model: kind === 'product' ? model.trim() : '', description: description.trim(), officialUrl: officialUrl.trim(),
-        objective, audience: audience.trim(), audienceUndecided, selectedChannels, mode };
       setDraftReady(false);
-      if (editing && project && project.name === input.name && project.kind === input.kind && project.model === input.model) {
+      if (!brandId && brandName.trim() && brands.some(item => item.name === brandName.trim())) {
+        throw new Error('같은 이름의 브랜드가 이미 있습니다. 기존 브랜드를 선택하거나 정확한 이름을 확인해 주세요.');
+      }
+      let selectedBrandId = brandId;
+      let selectedBrand = brands.find(item => item.id === brandId);
+      if (!brandId && brandName.trim()) {
+        const saved = await saveBrandProfile(newBrandProfile(brandName.trim()), null);
+        selectedBrand = saved; selectedBrandId = saved.id; setBrands(current => [...current, saved]); setBrandId(saved.id);
+      }
+      const youtubePrefix = category === 'berex' ? selectedBrand?.youtubePrefix?.berex :
+        category === 'environment' || category === 'wearable' ? selectedBrand?.youtubePrefix?.[category] : null;
+      const input = { name: name.trim(), kind, model: kind === 'product' ? model.trim() : '', description: description.trim(), officialUrl: officialUrl.trim(),
+        objective, audience: audience.trim(), audienceUndecided, selectedChannels, mode, brandId: selectedBrandId,
+        brandName: brandName.trim(), category, youtubePrefix: youtubePrefix || null, brandRuleRevision: selectedBrand?.revision || 0 };
+      if (editing && project && project.name === input.name && project.kind === input.kind && project.model === input.model &&
+          project.brandId === input.brandId) {
         const analyticalChange = project.objective !== input.objective || project.audience !== input.audience ||
-          project.audienceUndecided !== input.audienceUndecided || project.description !== input.description || project.officialUrl !== input.officialUrl;
+          project.audienceUndecided !== input.audienceUndecided || project.description !== input.description ||
+          project.officialUrl !== input.officialUrl || project.category !== input.category;
         update({ ...project, ...input, inputRevision: project.inputRevision + 1,
           evidenceRevision: project.evidenceRevision + (analyticalChange ? 1 : 0),
           manualResearchRequestId: null, manualContentRequestId: null,
           analysisHistory: analyticalChange ? [...project.analysisHistory, { inputRevision: project.inputRevision,
             evidenceRevision: project.evidenceRevision, at: new Date().toISOString(), questions: project.questions,
-            comparisons: project.comparisons, recommendations: project.recommendations }] : project.analysisHistory,
+            comparisons: project.comparisons, recommendations: project.recommendations,
+            researchInsights: project.researchInsights }] : project.analysisHistory,
           questions: analyticalChange ? [] : project.questions,
           comparisons: analyticalChange ? [] : project.comparisons,
           recommendations: analyticalChange ? [] : project.recommendations,
+          researchInsights: analyticalChange ? { questionClusters: [], unmetNeeds: [], productCandidates: [], existingContent: [] } : project.researchInsights,
           documents: analyticalChange ? Object.fromEntries(Object.entries(project.documents).map(([key, doc]) =>
             [key, doc && { ...doc, status: 'stale' }])) as typeof project.documents : project.documents });
         await flush();
@@ -133,6 +156,7 @@ export default function Home() {
         draftRevision.current = saved?.revision ?? null; draftId.current = saved?.draftId || crypto.randomUUID();
         setDraftKey('new'); setName(saved?.input.name || ''); setKind(saved?.input.kind || 'product');
         setModel(saved?.input.model || ''); setDescription(saved?.input.description || ''); setOfficialUrl(saved?.input.officialUrl || '');
+        setBrandId(saved?.input.brandId ?? null); setBrandName(saved?.input.brandName || ''); setCategory(saved?.input.category || 'unknown');
         setObjective(saved?.input.objective || 'sales'); setAudience(saved?.input.audience || '');
         setAudienceUndecided(saved?.input.audienceUndecided ?? true); setSelectedChannels(saved?.input.selectedChannels || [...channels]);
         setMode(saved?.input.mode || 'manual'); setEditing(false); setMessage('새 작업의 입력을 보관합니다. 기존 작업은 그대로 남아 있어요.'); setDraftReady(true);
@@ -178,6 +202,19 @@ export default function Home() {
       <details className={styles.more}><summary>자료 더하기 · 결과물 선택 <span className={styles.optional}>선택 사항</span></summary>
         {kind === 'product' && <div className="field"><label htmlFor="model">정확한 모델명, 있다면</label>
           <input id="model" value={model} onChange={event => setModel(event.target.value)} placeholder="예: 2026년형 A100" /></div>}
+        <div className="field"><label htmlFor="brand">소속 브랜드, 있다면</label>
+          <select id="brand" value={brandId || (brandName ? 'new' : '')} onChange={event => {
+            const selected = brands.find(item => item.id === event.target.value);
+            setBrandId(selected?.id || null); setBrandName(selected?.name || '');
+          }}><option value="">아직 지정하지 않음</option>
+            {brands.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            <option value="new">새 브랜드 추가</option></select>
+          {!brandId && <input aria-label="새 브랜드 이름" value={brandName} onChange={event => setBrandName(event.target.value)} placeholder="예: 코웨이" />}
+          <p className="small muted">브랜드를 명시적으로 연결한 프로젝트끼리만 자산을 재사용합니다.</p></div>
+        {kind === 'product' && <div className="field"><label htmlFor="category">제품군</label><select id="category" value={category} onChange={event => setCategory(event.target.value as ProductCategory)}>
+          <option value="unknown">아직 분류하지 않음</option><option value="berex">비렉스</option>
+          <option value="environment">환가전</option><option value="wearable">웨어러블로봇</option><option value="other">기타</option>
+        </select></div>}
         <div className="field"><label htmlFor="description">한 줄 설명 또는 강조하고 싶은 특징</label>
           <textarea id="description" value={description} onChange={event => setDescription(event.target.value)} placeholder="입력한 장점은 확인할 주장으로 다룹니다." /></div>
         <div className="field"><label htmlFor="official-url">공식 제품·서비스 링크</label>
