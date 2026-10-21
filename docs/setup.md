@@ -12,3 +12,9 @@
 OpenAI 연결 후보는 `OPENAI_API_KEY`, `OPENAI_RESEARCH_MODEL`, `OPENAI_WRITE_MODEL`, `OPENAI_VALIDATE_MODEL`을 서버 환경에 설정합니다. `PAID_EXECUTION_ENABLED=false`가 기본이며 계정·예산 D2 승인 전 변경하지 않습니다. 가격표 검토 날짜 `OPENAI_PRICE_CONFIRMED_AT`, 실행 예약액 `RUN_RESERVE_USD`, 전체 승인 총액 `APPROVED_TOTAL_USD`와 DB의 개인 예산 행까지 준비해야 합니다. 현재 비용 정산·결과 반영이 끝나지 않아 모든 값을 넣어도 실제 유료 호출은 코드에서 차단됩니다. 이 항목들을 활성화 대상으로 간주하지 마세요.
 
 Preview는 Vercel Deployment Protection 등 실제 접근 제어를 확인하고 공유합니다. `noindex`는 검색 제외 요청일 뿐 접근 제어가 아닙니다. 운영 도메인·운영 DB·운영 환경변수는 변경하지 않습니다.
+
+## 두 창에서 동시에 수정한 경우
+
+다른 창의 저장본과 겹치면 자동 저장을 멈추고 현재 초안을 별도로 보관합니다. 설정 → ‘보관한 초안 확인’에서 문구를 비교하거나 ‘초안 백업 받기’로 파일을 받을 수 있습니다. 초안은 기존 프로젝트를 자동으로 덮어쓰지 않습니다. 필요한 문구를 복사한 다음 최신 저장본을 열어 반영해 주세요. 저장 공간 자체가 부족한 경우 보관이 실패할 수 있으므로 안내가 나오면 ‘저장 전 내용 백업 받기’를 먼저 이용하세요.
+
+브라우저 검수 기록: `docs/review-checklist.md`. GitHub Actions 실행의 `review-evidence` 압축 파일에는 실제 테스트 화면이 있으며 보관 기간은 7일입니다. 예시 제품은 모두 허구이며 실제 업무 품질 승인 자료가 아닙니다.
