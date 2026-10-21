@@ -14,7 +14,7 @@ export function ManualExchange({ project, stage, channels, update, onError, onNo
   useEffect(() => { if (localError) errorRef.current?.focus(); }, [localError]);
   const reportError = (cause: unknown, fallback: string) => {
     const message = cause instanceof Error ? cause.message : fallback;
-    setLocalError(message); onError(message);
+    setLocalError(message); onError('');
     setNameMismatch(cause instanceof EntityMismatch ? cause : null);
   };
   const clearError = () => { setLocalError(''); setNameMismatch(null); onError(''); };
