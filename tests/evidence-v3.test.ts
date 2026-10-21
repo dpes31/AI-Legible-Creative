@@ -3,6 +3,7 @@ import { newProject, type ChannelDocument, type Project } from '../src/domain/sc
 import { EntityMismatch, applyDocumentProposal, importContent, importResearch, prepareContent, prepareResearch, updateDocumentText, validateDocument, verifyClaim } from '../src/domain/workflow';
 import { quantities } from '../src/domain/validation/document';
 import { buildStrategy, comparisonAssessment } from '../src/domain/analysis/strategy';
+import { approveInsight } from '../src/domain/insight';
 
 function base(): Project { return newProject({ name: '허구 검수컵', kind: 'product', description: '시험용 가상 자료', officialUrl: '', objective: 'sales', audience: '', audienceUndecided: true, selectedChannels: ['ad_copy', 'blog'], mode: 'manual' }); }
 function grounded() {
@@ -32,7 +33,7 @@ describe('근거와 결과의 변경 안전성', () => {
   });
   it('재작성 결과는 제안으로 보관하고 중간에 수정한 본문을 덮어쓰지 않는다', () => {
     let p = grounded(); p.documents.ad_copy = doc(p, '기존 문구', []);
-    p = prepareContent(p, ['ad_copy']).project;
+    p = prepareContent(approveInsight(p), ['ad_copy']).project;
     const response = JSON.stringify({ contract: 'alc.content.v1', requestId: p.manualContentRequestId, documents: [{ channel: 'ad_copy', blocks: [{ kind: 'heading', text: '다시 쓴 문구', claimRefs: [] }] }], unresolvedItems: [] });
     p = importContent(p, response);
     expect(p.documents.ad_copy?.blocks[0].text).toBe('기존 문구');
@@ -46,7 +47,7 @@ describe('근거와 결과의 변경 안전성', () => {
     expect(() => applyDocumentProposal({ ...p, evidenceRevision: 99 }, 'ad_copy')).toThrow('근거가 바뀐');
   });
   it('다시 쓸 채널만 요청하고 다른 채널의 응답을 가져오지 않는다', () => {
-    const p = prepareContent(base(), ['ad_copy']).project;
+    const p = prepareContent(approveInsight(base(), true), ['ad_copy']).project;
     expect(p.contentRequestChannels).toEqual(['ad_copy']);
     expect(() => importContent(p, JSON.stringify({ contract: 'alc.content.v1', requestId: p.manualContentRequestId, documents: [{ channel: 'blog', blocks: [{ kind: 'paragraph', text: '선택하지 않은 채널', claimRefs: [] }] }], unresolvedItems: [] }))).toThrow();
   });

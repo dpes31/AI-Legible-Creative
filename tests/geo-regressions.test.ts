@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newProject, type Project } from '../src/domain/schema';
 import { attachOriginalText, prepareContent } from '../src/domain/workflow';
 import { validateDocument } from '../src/domain/validation/document';
+import { approveInsight } from '../src/domain/insight';
 
 function project(): Project {
   return newProject({ name: '허구 코웨이형 의자', kind: 'product', model: 'A-1', description: '책상과 휴식 겸용이라는 사용자 설명',
@@ -15,7 +16,7 @@ describe('GEO 핵심 회귀 재현', () => {
     p.questions = [{ id: 'q1', text: '어느 모델이 작은 서재에 맞나요?', provenance: 'hypothesis', sourceIds: [] }];
     p.comparisons = [{ id: 'k1', competitor: '가상 경쟁 의자', criterion: '설치 공간', ownClaimIds: [], otherClaimIds: [], comparable: false,
       verdict: 'unknown', reason: '같은 조건의 자료 없음' }];
-    const prompt = prepareContent(p).prompt;
+    const prompt = prepareContent(approveInsight(p, true)).prompt;
     expect(prompt).toContain('https://example.org/official');
     expect(prompt).toContain('어느 모델이 작은 서재에 맞나요?');
     expect(prompt).toContain('가상 경쟁 의자');

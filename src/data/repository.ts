@@ -1,27 +1,69 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { assertProjectRelations, projectSchema, type Project } from '@/domain/schema';
 import { convertLegacy } from './legacy';
+import { brandProfileSchema, catalogEntitySchema, type BrandProfile, type CatalogEntity } from '@/domain/portfolio';
 
 const DB_NAME = 'alc-projects-v2';
 const LEGACY_KEY = 'origin-mvp-store';
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function database(): Promise<IDBPDatabase> {
-  if (!dbPromise) dbPromise = openDB(DB_NAME, 2, {
+  if (!dbPromise) dbPromise = openDB(DB_NAME, 3, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
         db.createObjectStore('projects', { keyPath: 'id' });
         db.createObjectStore('metadata');
       }
       if (oldVersion < 2) db.createObjectStore('briefDrafts', { keyPath: 'key' });
+      if (oldVersion < 3) {
+        db.createObjectStore('brandProfiles', { keyPath: 'id' });
+        db.createObjectStore('catalogEntities', { keyPath: 'id' });
+      }
     },
   });
   return dbPromise;
 }
 
+export async function listBrandProfiles(): Promise<BrandProfile[]> {
+  return (await (await database()).getAll('brandProfiles')).map(value => brandProfileSchema.parse(value));
+}
+
+export async function loadBrandProfile(id: string): Promise<BrandProfile | null> {
+  const value = await (await database()).get('brandProfiles', id);
+  return value ? brandProfileSchema.parse(value) : null;
+}
+
+export async function saveBrandProfile(value: BrandProfile, expectedRevision: number | null): Promise<BrandProfile> {
+  const valid = brandProfileSchema.parse(value); const db = await database();
+  const tx = db.transaction('brandProfiles', 'readwrite');
+  const current = await tx.store.get(valid.id) as BrandProfile | undefined;
+  if ((current?.revision ?? null) !== expectedRevision) { await tx.done; throw new RevisionConflict(); }
+  const next = { ...valid, revision: (current?.revision ?? 0) + 1, updatedAt: new Date().toISOString() };
+  await tx.store.put(next); await tx.done; return next;
+}
+
+export async function listCatalogEntities(brandId: string): Promise<CatalogEntity[]> {
+  return (await (await database()).getAll('catalogEntities')).map(value => catalogEntitySchema.parse(value))
+    .filter(value => value.brandId === brandId);
+}
+
+export async function saveCatalogEntity(value: CatalogEntity, expectedRevision: number | null): Promise<CatalogEntity> {
+  const valid = catalogEntitySchema.parse(value); const db = await database();
+  const tx = db.transaction('catalogEntities', 'readwrite');
+  const current = await tx.store.get(valid.id) as CatalogEntity | undefined;
+  if ((current?.revision ?? null) !== expectedRevision) { await tx.done; throw new RevisionConflict(); }
+  const parent = valid.parentId ? await tx.store.get(valid.parentId) as CatalogEntity | undefined : undefined;
+  if (valid.parentId && (!parent || parent.brandId !== valid.brandId || parent.ownerId !== valid.ownerId)) {
+    await tx.done; throw new Error('같은 브랜드의 상위 제품군이나 제품을 찾지 못했습니다.');
+  }
+  const next = { ...valid, revision: (current?.revision ?? 0) + 1, updatedAt: new Date().toISOString() };
+  await tx.store.put(next); await tx.done; return next;
+}
+
 export type BriefDraft = {
   key: string; draftId: string; projectId: string | null; revision: number; updatedAt: string;
-  input: Pick<Project, 'name' | 'kind' | 'model' | 'description' | 'officialUrl' | 'objective' | 'audience' | 'audienceUndecided' | 'selectedChannels' | 'mode'>;
+  input: Pick<Project, 'name' | 'kind' | 'model' | 'description' | 'officialUrl' | 'objective' | 'audience' | 'audienceUndecided' | 'selectedChannels' | 'mode'> &
+    Partial<Pick<Project, 'brandId' | 'brandName' | 'category'>>;
 };
 
 export async function loadBriefDraft(key: string): Promise<BriefDraft | null> {
