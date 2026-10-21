@@ -66,9 +66,10 @@ describe('허구의 여섯 채널 기능 검수', () => {
   it('실제 ZIP 압축 파일에서 한글 파일을 열 수 있다', async () => {
     const written = importContent(project(), fixture('content.partial.json'));
     const opened = await JSZip.loadAsync(await (await buildZip(written)).arrayBuffer());
-    expect(await opened.file('광고카피.txt')?.async('string')).toContain('검토용 제목');
+    expect(await opened.file('채널별_전체원고.docx')?.async('uint8array')).toBeInstanceOf(Uint8Array);
     expect(await opened.file('읽어주세요.txt')?.async('string')).toContain('블로그: 작성된 문서 없음');
     expect(await opened.file('공개 출처.txt')?.async('string')).toContain('공개 가능한 출처 없음');
-    expect(opened.file('광고카피.md')).not.toBeNull();
+    const word = await JSZip.loadAsync(await opened.file('채널별_전체원고.docx')!.async('uint8array'));
+    expect(await word.file('word/document.xml')?.async('string')).toContain('검토용 제목');
   });
 });
