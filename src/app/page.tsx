@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { channels, channelNames, newProject, type Channel, type Objective } from '@/domain/schema';
+import { loadBriefDraft, moveBriefDraft, saveBriefDraft, type BriefDraft } from '@/data/repository';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 import styles from '@/features/brief/BriefStart.module.css';
 
 export default function Home() {
   const router = useRouter();
-  const { project, loading, create, update } = useWorkspace();
+  const { project, loading, create, update, flush } = useWorkspace();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'brand' | 'product' | 'service'>('product');
   const [model, setModel] = useState('');
@@ -23,43 +24,100 @@ export default function Home() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [editing, setEditing] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftKey, setDraftKey] = useState('new');
+  const [draftState, setDraftState] = useState<'saving' | 'saved' | 'error'>('saved');
+  const draftRevision = useRef<number | null>(null);
+  const draftId = useRef(crypto.randomUUID());
+  const draftQueue = useRef<Promise<void>>(Promise.resolve());
+  const draftFailed = useRef(false);
+
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    const preferred = localStorage.getItem('alc-brief-focus-v1');
+    const activeProject = project;
+    const key = preferred === 'new' || !activeProject ? 'new' : `project:${activeProject.id}`;
+    void (async () => {
+      try {
+        const draft = await loadBriefDraft(key);
+        if (cancelled) return;
+        const input = draft?.input ?? (key !== 'new' ? activeProject : null);
+        if (input) {
+          setName(input.name); setKind(input.kind); setModel(input.model); setDescription(input.description);
+          setObjective(input.objective); setAudience(input.audience); setAudienceUndecided(input.audienceUndecided);
+          setOfficialUrl(input.officialUrl); setSelectedChannels(input.selectedChannels); setMode(input.mode);
+        }
+        draftRevision.current = draft?.revision ?? null;
+        draftId.current = draft?.draftId || crypto.randomUUID();
+        setDraftKey(key); setEditing(key !== 'new' && !!activeProject); setDraftReady(true);
+      } catch (cause) { if (!cancelled) { setDraftState('error'); setMessage(cause instanceof Error ? cause.message : '입력을 불러오지 못했어요.'); } }
+    })();
+    return () => { cancelled = true; };
+  }, [loading, project]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    const input: BriefDraft['input'] = { name, kind, model, description, officialUrl, objective, audience,
+      audienceUndecided, selectedChannels, mode };
+    const key = draftKey; const id = draftId.current;
+    draftFailed.current = false;
+    draftQueue.current = draftQueue.current.then(async () => {
+      setDraftState('saving');
+      try {
+        const saved = await saveBriefDraft({ key, draftId: id, projectId: key.startsWith('project:') ? key.slice(8) : null,
+          revision: draftRevision.current ?? 0, updatedAt: new Date().toISOString(), input }, draftRevision.current);
+        draftRevision.current = saved.revision;
+        setDraftState('saved');
+      } catch (cause) {
+        draftFailed.current = true; setDraftState('error');
+        setMessage(cause instanceof Error ? cause.message : '입력을 저장하지 못했어요. 현재 내용을 복사해 보관해 주세요.');
+      }
+    });
+  }, [draftReady, draftKey, name, kind, model, description, officialUrl, objective, audience, audienceUndecided, selectedChannels, mode]);
 
   const editCurrent = () => {
     if (!project) return;
-    setName(project.name); setKind(project.kind); setModel(project.model); setDescription(project.description);
-    setObjective(project.objective); setAudience(project.audience); setAudienceUndecided(project.audienceUndecided);
-    setOfficialUrl(project.officialUrl); setSelectedChannels(project.selectedChannels); setMode(project.mode);
     setEditing(true); setMessage('대상 이름·모델·기존 공식 링크를 바꾸면 자료가 섞이지 않도록 새 작업으로 만듭니다.');
   };
 
   const toggle = (channel: Channel) => setSelectedChannels(current => current.includes(channel) ? current.filter(x => x !== channel) : [...current, channel]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (loading || pending) return;
+    if (loading || !draftReady || pending) return;
     if (!name.trim() || (!audienceUndecided && !audience.trim()) || !selectedChannels.length) {
       setMessage('대상, 고객 상황 또는 ‘아직 정하지 않았어요’, 결과물 한 가지 이상을 선택해 주세요.'); return;
     }
     setPending(true); setMessage('');
     try {
+      await draftQueue.current;
+      if (draftFailed.current) throw new Error('입력 저장에 실패했습니다. 현재 내용을 보관한 뒤 다시 시도해 주세요.');
       const input = { name: name.trim(), kind, model: kind === 'product' ? model.trim() : '', description: description.trim(), officialUrl: officialUrl.trim(),
         objective, audience: audience.trim(), audienceUndecided, selectedChannels, mode };
-      if (editing && project && project.name === input.name && project.kind === input.kind && project.model === input.model &&
-          (!project.officialUrl || project.officialUrl === input.officialUrl)) {
+      setDraftReady(false);
+      if (editing && project && project.name === input.name && project.kind === input.kind && project.model === input.model) {
         const analyticalChange = project.objective !== input.objective || project.audience !== input.audience ||
           project.audienceUndecided !== input.audienceUndecided || project.description !== input.description || project.officialUrl !== input.officialUrl;
         update({ ...project, ...input, inputRevision: project.inputRevision + 1,
           evidenceRevision: project.evidenceRevision + (analyticalChange ? 1 : 0),
           manualResearchRequestId: null, manualContentRequestId: null,
+          analysisHistory: analyticalChange ? [...project.analysisHistory, { inputRevision: project.inputRevision,
+            evidenceRevision: project.evidenceRevision, at: new Date().toISOString(), questions: project.questions,
+            comparisons: project.comparisons, recommendations: project.recommendations }] : project.analysisHistory,
           questions: analyticalChange ? [] : project.questions,
           comparisons: analyticalChange ? [] : project.comparisons,
           recommendations: analyticalChange ? [] : project.recommendations,
           documents: analyticalChange ? Object.fromEntries(Object.entries(project.documents).map(([key, doc]) =>
             [key, doc && { ...doc, status: 'stale' }])) as typeof project.documents : project.documents });
+        await flush();
       } else {
-        await create(newProject(input));
+        const next = newProject(input);
+        await create(next);
+        await moveBriefDraft(draftKey, `project:${next.id}`, next.id);
+        localStorage.setItem('alc-brief-focus-v1', `project:${next.id}`);
       }
       setEditing(false); router.push('/review');
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : '작업을 만들지 못했어요.'); }
+    } catch (cause) { setDraftReady(true); setMessage(cause instanceof Error ? cause.message : '작업을 만들지 못했어요.'); }
     finally { setPending(false); }
   };
 
@@ -67,6 +125,18 @@ export default function Home() {
     {!loading && project && <div className={`card row ${styles.resume}`}>
       <div className={styles.resumeTitle}><span className="eyebrow">이어서 작업하기</span><strong>{project.name}{project.model ? ` · ${project.model}` : ''}</strong></div>
       <button className="button secondary" type="button" onClick={editCurrent}>입력 고치기</button><Link className="button secondary" href="/review">이어서 분석하기</Link><Link className="button secondary" href="/results">결과 확인하기</Link>
+      <button className="button text" type="button" onClick={() => { void (async () => {
+        await draftQueue.current;
+        if (draftFailed.current) return;
+        localStorage.setItem('alc-brief-focus-v1', 'new'); setDraftReady(false);
+        const saved = await loadBriefDraft('new');
+        draftRevision.current = saved?.revision ?? null; draftId.current = saved?.draftId || crypto.randomUUID();
+        setDraftKey('new'); setName(saved?.input.name || ''); setKind(saved?.input.kind || 'product');
+        setModel(saved?.input.model || ''); setDescription(saved?.input.description || ''); setOfficialUrl(saved?.input.officialUrl || '');
+        setObjective(saved?.input.objective || 'sales'); setAudience(saved?.input.audience || '');
+        setAudienceUndecided(saved?.input.audienceUndecided ?? true); setSelectedChannels(saved?.input.selectedChannels || [...channels]);
+        setMode(saved?.input.mode || 'manual'); setEditing(false); setMessage('새 작업의 입력을 보관합니다. 기존 작업은 그대로 남아 있어요.'); setDraftReady(true);
+      })(); }}>새 작업 시작</button>
     </div>}
     <div className={styles.workspace}>
       <section className={styles.intro} aria-labelledby="brief-heading">
@@ -82,7 +152,7 @@ export default function Home() {
       </section>
       <form className={`card ${styles.form}`} onSubmit={submit} aria-labelledby="form-heading">
         <div className={styles.formHeading}><div><p className="eyebrow">{editing ? '입력 수정' : '새 작업'}</p><h2 id="form-heading">{editing ? '필요한 정보만 바꾸세요.' : '세 가지만 알려 주세요.'}</h2></div><span className={styles.formMark} aria-hidden="true">↗</span></div>
-        <fieldset disabled={loading || pending} className={styles.fields}>
+        <fieldset disabled={loading || !draftReady || pending} className={styles.fields}>
         <div className={styles.group}>
           <div className="field"><label htmlFor="entity"><span className={styles.number}>01</span>무엇을 알리고 싶으신가요?</label>
             <input id="entity" value={name} onChange={event => setName(event.target.value)} placeholder="브랜드·제품·서비스 이름" required /></div>
@@ -124,6 +194,7 @@ export default function Home() {
         {mode === 'automatic' && <p role="status" className={styles.fieldHelp}>아직 자동 실행을 연결하지 않았습니다. 입력은 보관하고, 다음 화면에서 외부 AI로 직접 진행할 수 있어요.</p>}
       </fieldset>
       {message && <p role="alert" className="alert">{message}</p>}
+      <p role="status" className="small muted">{draftState === 'saving' ? '입력 저장 중…' : draftState === 'error' ? '입력을 저장하지 못했어요.' : '입력 저장됨'}</p>
       <button className={`button ${styles.submit}`} type="submit" disabled={loading || pending}>{pending ? '저장 중…' : editing ? '바뀐 입력 저장하기' : '브랜드 분석 시작'}<span aria-hidden="true">→</span></button>
       <p className={styles.submitNote}>아는 만큼만 적어 주세요. 자료는 다음 화면에서도 더할 수 있어요.</p>
       </fieldset>

@@ -8,7 +8,7 @@ type Workspace = {
   project: Project | null; projects: Project[]; loading: boolean;
   saveState: 'saved' | 'saving' | 'error'; error: string;
   create: (project: Project) => Promise<void>; select: (id: string) => Promise<void>;
-  update: (next: Project) => void; restore: (text: string) => Promise<void>; restoreLegacy: (text: string) => Promise<void>;
+  update: (next: Project) => void; flush: () => Promise<void>; restore: (text: string) => Promise<void>; restoreLegacy: (text: string) => Promise<void>;
   refresh: () => Promise<void>; clearError: () => void;
 };
 
@@ -84,6 +84,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const flush = async () => {
+    await queue.current;
+    if (blocked.current) throw new Error('저장하지 못했어요. 현재 내용을 백업하고 저장 오류를 확인해 주세요.');
+  };
+
   const restore = async (text: string) => {
     await queue.current;
     const restored = await importBackup(text);
@@ -96,7 +101,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     activate(restored); setProjects(await listProjects()); setError('');
   };
 
-  return <WorkspaceContext.Provider value={{ project, projects, loading, saveState, error, create, select, update, restore, restoreLegacy, refresh, clearError: () => setError('') }}>
+  return <WorkspaceContext.Provider value={{ project, projects, loading, saveState, error, create, select, update, flush, restore, restoreLegacy, refresh, clearError: () => setError('') }}>
     {children}
   </WorkspaceContext.Provider>;
 }

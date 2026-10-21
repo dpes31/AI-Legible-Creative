@@ -7,13 +7,50 @@ const LEGACY_KEY = 'origin-mvp-store';
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function database(): Promise<IDBPDatabase> {
-  if (!dbPromise) dbPromise = openDB(DB_NAME, 1, {
-    upgrade(db) {
-      db.createObjectStore('projects', { keyPath: 'id' });
-      db.createObjectStore('metadata');
+  if (!dbPromise) dbPromise = openDB(DB_NAME, 2, {
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        db.createObjectStore('projects', { keyPath: 'id' });
+        db.createObjectStore('metadata');
+      }
+      if (oldVersion < 2) db.createObjectStore('briefDrafts', { keyPath: 'key' });
     },
   });
   return dbPromise;
+}
+
+export type BriefDraft = {
+  key: string; draftId: string; projectId: string | null; revision: number; updatedAt: string;
+  input: Pick<Project, 'name' | 'kind' | 'model' | 'description' | 'officialUrl' | 'objective' | 'audience' | 'audienceUndecided' | 'selectedChannels' | 'mode'>;
+};
+
+export async function loadBriefDraft(key: string): Promise<BriefDraft | null> {
+  return (await (await database()).get('briefDrafts', key)) || null;
+}
+
+export async function saveBriefDraft(draft: BriefDraft, expectedRevision: number | null): Promise<BriefDraft> {
+  const tx = (await database()).transaction(['briefDrafts', 'metadata'], 'readwrite');
+  const current = await tx.objectStore('briefDrafts').get(draft.key) as BriefDraft | undefined;
+  if ((current?.revision ?? null) !== expectedRevision) {
+    const recoveryId = crypto.randomUUID();
+    await tx.objectStore('metadata').put({ id: recoveryId, at: new Date().toISOString(), briefDraft: draft }, `brief-conflict:${recoveryId}`);
+    await tx.done;
+    throw new RevisionConflict(recoveryId);
+  }
+  const saved = { ...draft, revision: (current?.revision ?? 0) + 1, updatedAt: new Date().toISOString() };
+  await tx.objectStore('briefDrafts').put(saved);
+  await tx.done;
+  return saved;
+}
+
+export async function moveBriefDraft(from: string, to: string, projectId: string): Promise<void> {
+  const tx = (await database()).transaction('briefDrafts', 'readwrite');
+  const draft = await tx.store.get(from) as BriefDraft | undefined;
+  if (draft) {
+    if (from !== to) await tx.store.delete(from);
+    await tx.store.put({ ...draft, key: to, projectId });
+  }
+  await tx.done;
 }
 
 export class RevisionConflict extends Error {

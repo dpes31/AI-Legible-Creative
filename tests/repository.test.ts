@@ -1,9 +1,20 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { newProject } from '../src/domain/schema';
-import { listConflictDrafts, importBackup, importLegacyBackup, loadProject, saveProject } from '../src/data/repository';
+import { listConflictDrafts, importBackup, importLegacyBackup, loadBriefDraft, loadProject, saveBriefDraft, saveProject } from '../src/data/repository';
 
 describe('브라우저 프로젝트 보존', () => {
+  it('입력 초안을 프로젝트와 별도로 저장하고 다른 탭의 오래된 값을 거절한다', async () => {
+    const input = { name: '허구 의자', kind: 'product' as const, model: 'A', description: '', officialUrl: '',
+      objective: 'feature' as const, audience: '', audienceUndecided: true,
+      selectedChannels: ['blog' as const], mode: 'manual' as const };
+    const saved = await saveBriefDraft({ key: 'new', draftId: crypto.randomUUID(), projectId: null,
+      revision: 0, updatedAt: new Date().toISOString(), input }, null);
+    const changed = await saveBriefDraft({ ...saved, input: { ...input, description: '새 입력' } }, saved.revision);
+    await expect(saveBriefDraft({ ...saved, input: { ...input, description: '오래된 창' } }, saved.revision)).rejects.toThrow('다른 창');
+    expect((await loadBriefDraft('new'))?.input.description).toBe('새 입력');
+    expect(changed.revision).toBe(saved.revision + 1);
+  });
   it('동일 프로젝트를 두 탭에서 수정하면 오래된 revision을 거절하고 저장본을 보존한다', async () => {
     const original = newProject({ name: '가상 브랜드 A', kind: 'brand', description: '', officialUrl: '', objective: 'trust', audience: '', audienceUndecided: true, selectedChannels: ['blog'], mode: 'manual' });
     const saved = await saveProject(original, null);

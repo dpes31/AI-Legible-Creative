@@ -3,6 +3,24 @@ import { join } from 'node:path';
 import JSZip from 'jszip';
 import { test, expect } from '@playwright/test';
 
+test('입력 중 이동·새로고침과 분석 후 복귀에도 값이 유지된다', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('무엇을 알리고 싶으신가요?').fill('허구 저장 시험 의자');
+  await page.getByText('자료 더하기 · 결과물 선택', { exact: false }).click();
+  await page.getByLabel('한 줄 설명 또는 강조하고 싶은 특징').fill('보존해야 하는 메모');
+  await expect(page.getByRole('status').filter({ hasText: '입력 저장됨' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('무엇을 알리고 싶으신가요?')).toHaveValue('허구 저장 시험 의자');
+  await expect(page.getByLabel('한 줄 설명 또는 강조하고 싶은 특징')).toHaveValue('보존해야 하는 메모');
+  await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
+  await expect(page.getByRole('heading', { name: '브랜드 분석: 허구 저장 시험 의자' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByLabel('무엇을 알리고 싶으신가요?')).toHaveValue('허구 저장 시험 의자');
+  await expect(page.getByLabel('한 줄 설명 또는 강조하고 싶은 특징')).toHaveValue('보존해야 하는 메모');
+  await page.getByRole('button', { name: '바뀐 입력 저장하기' }).click();
+  await expect(page.getByRole('heading', { name: '브랜드 분석: 허구 저장 시험 의자' })).toBeVisible();
+});
+
 test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 연다', async ({ page }, testInfo) => {
   test.setTimeout(120000);
   await page.goto('/');
