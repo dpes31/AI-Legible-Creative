@@ -134,3 +134,4 @@
 - 사용자가 2단계 화면 끝에서 다음 행동을 찾지 못함. 기존은 인사이트 카드 안에 행동 버튼이 있고, 카드 아래에는 `위에서 ... 확인하면`이라는 안내만 있었다. 설명 때 실제 존재하지 않는 `제품 사실을 담아 작성`이라는 표현을 사용한 것도 혼란을 키웠다.
 - 인사이트 의견은 자동 저장되며 자료·질문 아래 마지막 카드에서 실제 버튼 이름 `원문 확인하고 작성하기` / `자료 보완용 구성안 요청문 만들기`를 선택하게 정리. 원문을 대조한 공개 주장 있으면 같은 자리에 `이 방향으로 작성 요청문 만들기`가 표시된다. 버튼 오류·저장 중 상태도 이 마지막 카드에 표시. 앞선 버튼·안내만 있는 구간은 제거.
 - 로컬 lint/typecheck/단위 56개/build 통과. 모바일에서 마지막 카드의 실제 버튼과 원문 패널 이동을 확인하는 E2E를 보강했으며 새 CI 실행 결과를 확인해야 한다. 운영 변경·main 병합 없음.
+- 기능 SHA `82e0ec28bb5c1dec7e65adffde13f717185dc8bf`의 [CI run 39771774223](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39771774223): 설치·lint·typecheck·단위 검사·Chromium/WebKit E2E·build 모두 성공. [보호된 Preview](https://ai-legible-creative-l5s4yzc0a-dpes31s-projects.vercel.app/) READY. 이전 URL의 구 UI와 구분해야 한다. 실제 iPhone Safari 실기기 사용성은 여전히 미검수.
