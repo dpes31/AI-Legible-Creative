@@ -127,3 +127,4 @@
 - 외부 AI 발췌를 검증 자료로 승격하지 않도록 승인 가능 여부를 실제 작성 brief의 필터와 맞췄다. 사용자 수정 의견과 선택 채널을 요청문에 보존한다. 작성 저장 오류는 버튼 바로 아래에 표시한다.
 - 로컬 `npm run lint`, `npm run typecheck`, `npm run test`(56개), `npm run build` 통과. 첫 build는 Next.js 임시 캐시 손상으로 실패하여 캐시 디렉터리를 보관한 뒤 재실행해 통과. 로컬 `npm run test:e2e -- --project=chromium --grep '원문을 확인한 뒤'`는 브라우저 실행 파일이 없어 미실행. CI 브라우저 E2E 확인 전에는 화면 통과로 보고하지 않는다.
 - 다음 작업: 이 브랜치의 CI Chromium/WebKit에서 근거 패널 열기·직접 대조·한 번에 요청문 열기·새로고침 복원 확인, 보호된 Preview 준비 후 실제 iPhone에서 확인. 실제 코웨이 원문 의미 검증, 자동 실행의 남은 구현은 별도 미완료.
+- 수정 기능 SHA `dd3cbb7d68c985bc61a019aa32ed264a4718e36e`의 [CI run 39766786073](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39766786073): npm ci·lint·typecheck·단위 56개·Chromium/WebKit E2E 14개·build 통과. 새 E2E에서 원문 확인으로 초점 이동, 확인 후 작성 요청문 즉시 표시와 새로고침 복원을 확인했다. [보호된 Preview](https://ai-legible-creative-l3ao471f1-dpes31s-projects.vercel.app/) READY. 이 검증은 허구 fixture와 브라우저 엔진 기준이며 실제 iPhone Safari 및 코웨이 원문 의미 검증은 아직 하지 않았다.
