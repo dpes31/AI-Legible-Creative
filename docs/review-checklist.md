@@ -4,6 +4,7 @@
 
 - 기능 원격 SHA `19d0efa7c4d267820951db6acb23c6f97b1f11fd`. 사용자가 신고한 `manufacturer_claim_only` 비교 판단을 포함한 허구의 `alc.research.v2` 자료로 G03/G06/T06/T07 일부 검증. 인용문 불일치가 있어도 나머지 출처 2개·주장 2개·질문 1개·비교 1개·추천 1개, v2 질문 군집과 미충족 요구를 보존하며 비교는 `unknown`으로 남는지 단위 통과.
 - lint/typecheck/Vitest 54개/build 로컬 통과. 새 모바일 브라우저 E2E는 추가했으나 로컬 실행 파일이 없어 **미실행**. 원격 CI 통과 여부는 별도 기록 전까지 통과로 세지 않는다. 실제 사용자 응답의 공식 URL 원문·각 모델의 주장은 확인하지 않았다.
+- 원격 SHA `48c72f0af649f821a5b82fccedb323806577ee92`의 [CI 39755986776](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39755986776): 54개 단위·Chromium/WebKit E2E 총 12개 및 build 통과. 모바일 폭에서 v2 응답 가져오기→비교 미확인·질문 표시→재열기까지 시험했다. 실제 iPhone/Android 실기기·제품 URL의 원문 대조는 미실행.
 
 ## 최신 브라우저 검수 · 2026-10-22 UTC
 

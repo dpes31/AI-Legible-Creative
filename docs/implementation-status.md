@@ -6,6 +6,7 @@
 - 외부 입력의 이 표기를 허용하지만 내부 비교는 계속 `unknown`·비교 미확인으로 저장한다. 정의되지 않은 표기에는 영어 경로 대신 몇 번째 비교인지 한국어로 안내한다. 실패 시 붙여넣은 원문은 그대로 보관한다.
 - 허구의 v2 응답 fixture로 출처·주장·고객 질문·군집·미충족 요구·비교·추천 관계가 모두 들어오는지, 제조사 발표를 독립 검증이나 우위로 승인하지 않는지, 불일치 인용이 확인 목록에 남는지 검사했다. 제공받은 코웨이 제품 조사 내용과 사내 자료는 공개 저장소에 넣지 않았다.
 - 기능 커밋: 로컬 `7b28d809dc73b0067f08c7edbab4b5aba05f0642`, 같은 tree의 원격 `19d0efa7c4d267820951db6acb23c6f97b1f11fd`. 로컬 lint/typecheck/Vitest 54개/build 통과. 로컬 Playwright는 브라우저 바이너리가 없어 실행되지 않았다. 원격 CI·Preview 결과는 이 기록에 이어 추가한다.
+- 수정된 E2E·기록을 포함한 원격 SHA `48c72f0af649f821a5b82fccedb323806577ee92`: [CI 39755986776](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39755986776)에서 npm ci, lint, typecheck, Vitest 54개, Chromium·WebKit E2E 12개, build 모두 통과. [보호된 Preview](https://ai-legible-creative-gy4q385o5-dpes31s-projects.vercel.app/) READY, target=preview. 실제 iPhone Safari 사용자의 붙여넣기·원문 링크 검증은 별도 확인 필요.
 - 이후 작업: 새 CI의 모바일 Chromium/WebKit 가져오기·재열기 검사 확인, 사용자가 동일 requestId의 보관 응답을 새 Preview에 붙여넣어 확인. 실제 URL 원문과 제품별 조건의 의미 검수는 가져오기 성공과 별개다. P6 서버 결과 반영·비용 정산·인증 연결은 아래 미완료 상태 유지.
 
 ## 2026-10-22 재개 검수 결과
