@@ -1,5 +1,15 @@
 # 검수 기록
 
+## 최신 브라우저 검수 · 2026-10-22 UTC
+
+- 검수 코드: `refactor/evidence-workflow-v2` 원격 `f31276b5fdd8b70f00317dfa08d8eeb89666ccd8`, [CI 실행 39718958414](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39718958414). npm ci, lint, typecheck, Vitest 52개, Playwright Chromium·WebKit 10개, build 통과.
+- G01/G13/T03: 두 탭을 열고 첫 창에서 편집·재열기, 두 번째 창에서 충돌한 내용을 별도 보관, 첫 저장본 유지까지 실제 브라우저 시험 통과. 앞선 두 CI 실행은 재현 실패 기록으로 남긴다.
+- G06/G09/G11/G18 및 T06/T13/T15/T24 일부: 허구 fixture의 조사·작성 2왕복, 여섯 채널 선택, 저장 후 재열기, 미완료 상태, 클립보드 거절 대체, ZIP 속 단일 Word XML 한글·섹션, 320~1440px 가로 넘침 없음이 Chromium/WebKit에서 통과. 후기 영상은 기본 해제 후 명시 선택했다. 실제 MS Word와 휴대폰 다운로드는 미실행.
+- G04/G05/G17 일부: 모의 공급자 단위 시험은 인사이트 수정 의견이 작성 brief에 들어가며 검수 전 호출이 멈춤을 확인했다. 외부 API 실연결·서버 결과 반영·비용 정산·RLS 두 계정 교차 시험은 **미통과/미실행**으로 유지한다.
+- 실제 코웨이 제품의 성능·가격·경쟁 우위·공식 URL 원문, 한국어 원고 품질, GEO 추천/인용 효과는 확인하지 않았다. 허구 fixture 성공을 실무 품질 통과로 계산하지 않는다. 실제 API 비용 US$0, 실기기 검수 미실행.
+
+아래의 2026-10-21 표는 해당 시점의 과거 상태로 보존하며, 서로 다른 SHA의 미실행 행을 최신 통과로 오해하지 않는다.
+
 ## GEO 개정판 검수 현황 (기능 트리 `93daffb` / 원격 `e64e0ca`, 2026-10-21 UTC)
 
 로컬 Node 22: `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test`(13파일/50개), `npm run build` 통과. `ALC_WORD_QA_OUTPUT=/tmp/alc-review-word.docx npm run test -- tests/word-export.test.ts`로 생성한 파일을 python-docx 1.2.0에서 열어 한글 제목·섹션 2개·줄바꿈을 확인했습니다. 브라우저 바이너리가 없는 컨테이너라 **이번 SHA의 `npm run test:e2e`와 실기기 검사는 아직 통과로 기록하지 않습니다**. GitHub CI/Preview 확인 후 보완합니다. 시험 자료는 허구이며 코웨이 실무 원고 품질 검수를 대신하지 않습니다.

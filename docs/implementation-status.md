@@ -1,5 +1,15 @@
 # 개발 진행 기록
 
+## 2026-10-22 재개 검수 결과
+
+- 검수한 기능 tree: 로컬 `b6a438a`, 원격 `f31276b5fdd8b70f00317dfa08d8eeb89666ccd8`. 테스트 브랜치 `refactor/evidence-workflow-v2`, Draft PR #2, main `62bb391` 유지. 운영 환경·DB 변경 및 유료 호출 0회.
+- P1 재현·수정: 두 번째 탭의 단순 복원만으로 IndexedDB 초안 revision이 증가해 첫 번째 탭의 정상 수정이 충돌하던 결함을 확인했다. 변경 없는 복원은 저장을 건너뛰고 실제 수정만 저장한다. 충돌 발생 시 양쪽 입력과 사용자 안내를 별도로 보존한다.
+- P4 보강: 다섯 기본 채널, 후기 영상 선택. 확인된 제품 기능·조건을 설명하는 실질 문단과 고객 질문에 대한 답이 없는 원고는 완성본으로 승인하지 않는다.
+- P6 모의 경로 보강: 채널 작성에도 검수된 `alc.brief.v1`의 질문·조건·수정 의견을 전달한다. 인사이트 검수 전 모의 작성은 공급자 호출 없이 멈춘다. 실제 서버의 원자적 결과 반영·비용 정산·인증 UI·동시성 시험은 여전히 미완료여서 유료 호출 차단 유지. **API 키만 추가하면 자동 실행이 완성되는 상태가 아니다.**
+- CI [39718958414](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39718958414): `npm ci`, lint, typecheck, Vitest 52개, Chromium·WebKit E2E 10개, build 모두 통과. 로컬에서도 lint/typecheck/test/build 통과. 이 컨테이너의 Playwright 바이너리 설치는 CDN 응답 오류로 실패해 CI 브라우저 검수를 근거로 기록한다.
+- [Preview](https://ai-legible-creative-5on0gmcx3-dpes31s-projects.vercel.app/) READY, 해당 원격 SHA의 보호된 검수 배포. 인증된 사용자 화면 접속·실제 iPhone/Android·200% 확대·코웨이 원문 의미 검증·실무 원고의 사람 평가·실제 AI 검색 관찰은 미실행.
+- 다음 작업: P6의 안전한 서버 결과 반영과 예산 원장 정산·권한/동시성 검증, 클라우드 UI 연결을 별도 검수 자료로 완성한다. 코웨이 비렉스 트리플체어2 슬림의 공식 원문과 모델별 조건을 사람과 함께 확인해 결과 품질을 평가한다. 그전에는 수동 검수판과 모의 자동 경로만 제출한다.
+
 ## 2026-10-21 GEO 통합 수정 진행 체크포인트
 
 - 원격 테스트 브랜치 `refactor/evidence-workflow-v2`는 기존 HEAD `8a81dfb` 위에 7개 단계별 커밋으로 전진. 최신 원격 기능 HEAD `e64e0ca27c1646b2758550c7a33fc55f0e0000b5`(로컬 동일 트리 `93daffb`). main `62bb391` 변경 없음. Draft PR #2 유지. 운영 배포·DB·환경변수 변경 없음.
