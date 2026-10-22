@@ -39,6 +39,7 @@ export default function Home() {
   const draftQueue = useRef<Promise<void>>(Promise.resolve());
   const draftFailed = useRef(false);
   const draftError = useRef('');
+  const lastDraftInput = useRef('');
   const currentProject = useRef(project);
   useEffect(() => { currentProject.current = project; }, [project]);
 
@@ -60,6 +61,14 @@ export default function Home() {
           setObjective(input.objective); setAudience(input.audience); setAudienceUndecided(input.audienceUndecided);
           setOfficialUrl(input.officialUrl); setSelectedChannels(input.selectedChannels); setMode(input.mode);
         }
+        lastDraftInput.current = JSON.stringify({
+          name: input?.name ?? '', kind: input?.kind ?? 'product', model: input?.model ?? '',
+          brandId: input?.brandId ?? null, brandName: input?.brandName ?? '', category: input?.category ?? 'unknown',
+          description: input?.description ?? '', officialUrl: input?.officialUrl ?? '',
+          objective: input?.objective ?? 'sales', audience: input?.audience ?? '',
+          audienceUndecided: input?.audienceUndecided ?? true,
+          selectedChannels: input?.selectedChannels ?? defaultChannels, mode: input?.mode ?? 'manual',
+        });
         draftRevision.current = draft?.revision ?? null;
         draftId.current = draft?.draftId || crypto.randomUUID();
         setDraftKey(key); setEditing(key !== 'new' && !!activeProject); setDraftReady(true);
@@ -72,6 +81,8 @@ export default function Home() {
     if (!draftReady) return;
     const input: BriefDraft['input'] = { name, kind, model, brandId, brandName, category, description, officialUrl, objective, audience,
       audienceUndecided, selectedChannels, mode };
+    const serialized = JSON.stringify(input);
+    if (serialized === lastDraftInput.current) return;
     const key = draftKey; const id = draftId.current;
     draftFailed.current = false;
     draftQueue.current = draftQueue.current.then(async () => {
@@ -80,6 +91,7 @@ export default function Home() {
         const saved = await saveBriefDraft({ key, draftId: id, projectId: key.startsWith('project:') ? key.slice(8) : null,
           revision: draftRevision.current ?? 0, updatedAt: new Date().toISOString(), input }, draftRevision.current);
         draftRevision.current = saved.revision;
+        lastDraftInput.current = serialized;
         setDraftState('saved');
       } catch (cause) {
         draftFailed.current = true; setDraftState('error');
@@ -177,6 +189,14 @@ export default function Home() {
         setObjective(saved?.input.objective || 'sales'); setAudience(saved?.input.audience || '');
         setAudienceUndecided(saved?.input.audienceUndecided ?? true); setSelectedChannels(saved?.input.selectedChannels || [...defaultChannels]);
         setMode(saved?.input.mode || 'manual'); setEditing(false); setMessage('새 작업의 입력을 보관합니다. 기존 작업은 그대로 남아 있어요.'); setDraftReady(true);
+        lastDraftInput.current = JSON.stringify({
+          name: saved?.input.name || '', kind: saved?.input.kind || 'product', model: saved?.input.model || '',
+          brandId: saved?.input.brandId ?? null, brandName: saved?.input.brandName || '', category: saved?.input.category || 'unknown',
+          description: saved?.input.description || '', officialUrl: saved?.input.officialUrl || '',
+          objective: saved?.input.objective || 'sales', audience: saved?.input.audience || '',
+          audienceUndecided: saved?.input.audienceUndecided ?? true,
+          selectedChannels: saved?.input.selectedChannels || defaultChannels, mode: saved?.input.mode || 'manual',
+        });
       })(); }}>새 작업 시작</button>
     </div>}
     <div className={styles.workspace}>
