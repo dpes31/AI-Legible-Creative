@@ -36,6 +36,15 @@ export function channelCompleteness(project: Project, document: ChannelDocument)
   if (['product_page', 'blog', 'youtube_description'].includes(document.channel) && project.questions.length &&
       !substantive.some(block => block.questionRefs?.some(ref => project.questions.some(question => question.id === ref))))
     missing.push('어떤 고객 질문에 답하는지 본문 구간을 연결해 주세요. 질문 목록만 나열하지 마세요.');
+  // If the strategy assigns questions to channels, an unassigned channel
+  // cannot become a finished asset merely by meeting its format checklist.
+  const hasChannelPlan = project.answerPlans.some(plan => plan.channels.length);
+  if (hasChannelPlan && ['ad_copy', 'press_release', 'product_page', 'blog', 'youtube_description'].includes(document.channel)) {
+    const assigned = project.answerPlans.filter(plan => plan.channels.some(direction => direction.channel === document.channel));
+    if (!assigned.length) missing.push('이 채널이 맡을 고객 질문과 작성 방향을 인사이트에서 정해 주세요.');
+    else if (!substantive.some(block => block.questionRefs?.some(ref => assigned.some(plan => plan.questionId === ref))))
+      missing.push('고객 질문에 답하는 본문 구간을 해당 채널의 작성 방향과 연결해 주세요.');
+  }
   // The research response assigns questions to channels. A heading or a copied
   // questionRef alone cannot certify that the model-specific answer survived.
   if (['product_page', 'blog', 'youtube_description'].includes(document.channel)) {
