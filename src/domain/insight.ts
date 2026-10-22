@@ -15,11 +15,14 @@ export function reviseInsight(project: Project, feedback: string): Project {
     documents: Object.fromEntries(Object.entries(project.documents).map(([channel, doc]) => [channel, doc && { ...doc, status: 'stale' }])) as Project['documents'] };
 }
 
+export function hasUsableEvidence(project: Project): boolean {
+  return project.claims.some(c => c.status === 'supported' && c.target !== 'competitor' && c.target !== 'unresolved' &&
+    project.sources.some(s => s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed && s.origin !== 'external_response'));
+}
+
 export function approveInsight(project: Project, outline = false): Project {
   if (!project.name.trim()) throw new Error('대상 이름을 먼저 입력해 주세요.');
-  const usable = project.claims.some(c => c.status === 'supported' && c.target !== 'competitor' && c.target !== 'unresolved' &&
-    project.sources.some(s => s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed));
-  if (!usable && !outline) throw new Error('공개할 수 있는 사실이 없습니다. 근거를 확인하거나 자료 보완용 구성안을 명시적으로 선택해 주세요.');
+  if (!hasUsableEvidence(project) && !outline) throw new Error('공개할 수 있는 사실이 없습니다. 근거를 확인하거나 자료 보완용 구성안을 명시적으로 선택해 주세요.');
   return { ...project, insight: { ...project.insight, revision: project.insight.revision + 1,
     approval: outline ? 'outline' : 'approved', inputRevision: project.inputRevision,
     evidenceRevision: project.evidenceRevision, approvedAt: new Date().toISOString() }, manualContentRequestId: null };

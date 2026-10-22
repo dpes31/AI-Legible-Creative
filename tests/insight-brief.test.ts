@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newProject } from '../src/domain/schema';
-import { approveInsight, insightCurrent, reviseInsight } from '../src/domain/insight';
+import { approveInsight, hasUsableEvidence, insightCurrent, reviseInsight } from '../src/domain/insight';
 import { buildContentBrief } from '../src/domain/content-brief';
 import { prepareContent } from '../src/domain/workflow';
 
@@ -46,5 +46,15 @@ describe('작성 공통 자료와 인사이트 검수', () => {
     expect(brief.allowedClaims).toHaveLength(1);
     expect(brief.allowedClaims[0].statement).not.toContain('20%');
     expect(prepareContent(p).prompt).toContain('새로운 기능·수치·비교 우위');
+  });
+  it('외부 AI 응답만으로 원문을 확인한 것처럼 작성 경로를 열지 않는다', () => {
+    const p = specimen();
+    p.sources[0].origin = 'external_response';
+    expect(hasUsableEvidence(p)).toBe(false);
+    expect(() => approveInsight(p)).toThrow('공개할 수 있는 사실');
+    const outline = approveInsight(p, true);
+    const prepared = prepareContent(outline, outline.selectedChannels);
+    expect(prepared.project.manualContentRequestId).toBeTruthy();
+    expect(buildContentBrief(outline, prepared.project.manualContentRequestId!, outline.selectedChannels).allowedClaims).toHaveLength(0);
   });
 });

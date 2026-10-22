@@ -41,9 +41,8 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   await page.screenshot({ path: testInfo.outputPath('research-fictional-fixture.png'), fullPage: true });
   await page.getByText('근거 확인하기', { exact: false }).first().click();
   await expect(page.getByRole('heading', { name: '뚜껑을 돌려 닫는 구조', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '자료 보완용 구성안으로 진행' }).click();
-  await page.getByRole('link', { name: '작성 요청문으로 가기' }).click();
-  await page.getByRole('button', { name: '채널별 작성 요청문 만들기' }).click();
+  await page.getByRole('button', { name: '자료 보완용 구성안 요청문 만들기' }).click();
+  await expect(page).toHaveURL(/\/results$/);
   const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
   const contentId = prompt.match(/requestId: ([\w-]+)/)?.[1];
   expect(contentId).toBeTruthy();
@@ -182,6 +181,11 @@ test('실제 제품 응답의 이름 차이와 우위 표기를 버튼 옆에서
   await page.getByRole('button', { name: '같은 제품임을 확인하고 가져오기' }).click();
   await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
   await expect(page.getByText('원문 확인이 필요한 주장이 2개 있습니다.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: '이 방향으로 작성', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '원문 확인하고 작성하기' }).click();
+  await expect(page.locator('#evidence')).toHaveAttribute('open', '');
+  await expect(page.locator('#evidence')).toBeFocused();
+  await expect(page).toHaveURL(/\/review$/);
   await expect(page.locator('section[aria-labelledby="analysis-summary"]').getByText('인용문이 일치하지 않음: C2', { exact: false })).toBeVisible();
   await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
@@ -208,4 +212,32 @@ test('제조사 발표만 있는 v2 비교도 나머지 조사 내용을 잃지 
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
   await page.reload();
   await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+});
+
+test('원문을 확인한 뒤 작성 버튼 한 번으로 현재 요청문을 열고 수정 방향을 보존한다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByLabel('무엇을 알리고 싶으신가요?').fill('가상 브랜드 솔담 보온컵');
+  await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
+  await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
+  const request = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
+  const research = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/manual/research.valid.json'), 'utf8'));
+  research.requestId = request.match(/요청 ID: ([\w-]+)/)?.[1];
+  await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
+  await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
+  await page.getByLabel('수정할 방향').fill('뚜껑을 닫는 방법을 먼저 설명해 주세요.');
+  await page.getByRole('button', { name: '원문 확인하고 작성하기' }).click();
+  const evidence = page.locator('#evidence');
+  await expect(evidence).toHaveAttribute('open', '');
+  await evidence.getByLabel('AI가 제시한 인용문입니다. 실제 원문을 열어 본문을 붙여넣어 주세요.').fill('솔담 보온컵은 뚜껑을 돌려 닫는 구조입니다.');
+  await evidence.getByLabel('공개 문구의 근거로 사용해도 됩니다').check();
+  await evidence.getByRole('button', { name: '원문 연결하기' }).click();
+  await evidence.getByRole('button', { name: '원문과 직접 대조했어요' }).click();
+  await expect(page.getByRole('button', { name: '이 방향으로 작성 요청문 만들기' })).toBeVisible();
+  await page.getByRole('button', { name: '이 방향으로 작성 요청문 만들기' }).click();
+  await expect(page).toHaveURL(/\/results$/);
+  await expect(page.getByLabel('외부 AI에 보낼 요청문')).toHaveValue(/뚜껑을 닫는 방법을 먼저 설명해 주세요/);
+  await expect(page.getByLabel('외부 AI에 보낼 요청문')).toHaveValue(/뚜껑을 돌려 닫는 구조/);
+  await page.reload();
+  await expect(page.getByLabel('외부 AI에 보낼 요청문')).toHaveValue(/뚜껑을 닫는 방법을 먼저 설명해 주세요/);
 });
