@@ -1,5 +1,10 @@
 # 검수 기록
 
+## v2 조사 가져오기 회귀 · 2026-10-22 UTC
+
+- 기능 원격 SHA `19d0efa7c4d267820951db6acb23c6f97b1f11fd`. 사용자가 신고한 `manufacturer_claim_only` 비교 판단을 포함한 허구의 `alc.research.v2` 자료로 G03/G06/T06/T07 일부 검증. 인용문 불일치가 있어도 나머지 출처 2개·주장 2개·질문 1개·비교 1개·추천 1개, v2 질문 군집과 미충족 요구를 보존하며 비교는 `unknown`으로 남는지 단위 통과.
+- lint/typecheck/Vitest 54개/build 로컬 통과. 새 모바일 브라우저 E2E는 추가했으나 로컬 실행 파일이 없어 **미실행**. 원격 CI 통과 여부는 별도 기록 전까지 통과로 세지 않는다. 실제 사용자 응답의 공식 URL 원문·각 모델의 주장은 확인하지 않았다.
+
 ## 최신 브라우저 검수 · 2026-10-22 UTC
 
 - 검수 코드: `refactor/evidence-workflow-v2` 원격 `f31276b5fdd8b70f00317dfa08d8eeb89666ccd8`, [CI 실행 39718958414](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39718958414). npm ci, lint, typecheck, Vitest 52개, Playwright Chromium·WebKit 10개, build 통과.

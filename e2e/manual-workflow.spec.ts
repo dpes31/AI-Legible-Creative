@@ -204,7 +204,7 @@ test('제조사 발표만 있는 v2 비교도 나머지 조사 내용을 잃지 
   await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
   await expect(page.locator('section[aria-labelledby="analysis-summary"]').getByText('인용문이 일치하지 않음: C2', { exact: false })).toBeVisible();
   await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
-  await expect(page.getByText('기존 제품보다 얼마나 더 담을 수 있나요?')).toBeVisible();
+  await expect(page.locator('ul.list').getByText('기존 제품보다 얼마나 더 담을 수 있나요?')).toBeVisible();
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(1);
   await page.reload();
   await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
