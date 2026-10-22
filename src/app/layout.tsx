@@ -1,35 +1,16 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-
-import { TopNav } from "@/components/layout/TopNav";
-import { SideNav } from "@/components/layout/SideNav";
-
-const inter = Inter({ subsets: ["latin"] });
+import type { Metadata } from 'next';
+import { WorkspaceProvider } from '@/features/workspace/WorkspaceProvider';
+import { Header } from '@/features/workspace/Header';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "ORIGIN MVP Suite",
-  description: "AI-Legible Creative Validation & Generation Dashboard",
+  title: 'ORIGIN | 근거 있는 브랜드 문구',
+  description: '고객이 선택할 이유를 근거로 확인하고, 채널별 한국어 문구를 만듭니다.',
+  robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>
-        <TopNav />
-        <div className="flex bg-[var(--background)]">
-          <SideNav />
-          <main className="flex-1 min-h-[calc(100vh-4rem)] p-8">
-            <div className="max-w-7xl mx-auto">
-              {children}
-            </div>
-          </main>
-        </div>
-      </body>
-    </html>
-  );
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <html lang="ko" data-scroll-behavior="smooth"><body>
+    <WorkspaceProvider><Header /><main id="main-content" tabIndex={-1} className="container page-main">{children}</main></WorkspaceProvider>
+  </body></html>;
 }

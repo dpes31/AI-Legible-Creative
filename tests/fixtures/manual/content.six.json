@@ -1,0 +1,13 @@
+{
+  "contract": "alc.content.v1",
+  "requestId": "fixture-request",
+  "documents": [
+    { "channel": "ad_copy", "blocks": [{ "kind": "heading", "text": "닫는 방식부터 살펴보세요", "claimRefs": [] }, { "kind": "paragraph", "text": "내게 필요한 보온컵인지 제품 설명을 확인하세요.", "claimRefs": [] }] },
+    { "channel": "product_page", "blocks": [{ "kind": "heading", "text": "뚜껑을 어떻게 닫나요?", "claimRefs": [] }, { "kind": "note", "text": "규격·가격·배송 조건을 추가 확인하세요.", "claimRefs": [] }] },
+    { "channel": "press_release", "blocks": [{ "kind": "heading", "text": "발표 내용 확인 전 초안", "claimRefs": [] }, { "kind": "note", "text": "발표일과 공식 발언을 제공받기 전에는 배포하지 마세요.", "claimRefs": [] }] },
+    { "channel": "youtube_description", "blocks": [{ "kind": "heading", "text": "영상 제작 전 설명 초안", "claimRefs": [] }, { "kind": "paragraph", "text": "영상에서 확인할 사용 장면과 제품 안내를 정리합니다.", "claimRefs": [] }] },
+    { "channel": "blog", "blocks": [{ "kind": "heading", "text": "보온컵을 고를 때 무엇을 먼저 볼까요?", "claimRefs": [] }, { "kind": "paragraph", "text": "뚜껑 구조와 사용 조건을 확인하면 선택에 도움이 됩니다.", "claimRefs": [] }] },
+    { "channel": "review_video", "blocks": [{ "kind": "heading", "text": "후기 촬영 가이드", "claimRefs": [] }, { "kind": "bullet", "text": "실제 사용자가 뚜껑을 닫는 장면을 촬영해 주세요.", "claimRefs": [] }, { "kind": "note", "text": "실제 발언과 경험은 촬영 후에만 추가하세요.", "claimRefs": [] }] }
+  ],
+  "unresolvedItems": ["이 자료와 결과는 허구의 기능 검수 예시입니다."]
+}
