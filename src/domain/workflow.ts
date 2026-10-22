@@ -100,16 +100,59 @@ function uniqueRefs(items: { ref: string }[]) {
   if (new Set(refs).size !== refs.length) throw new ImportError('응답의 자료 번호가 중복됩니다. 조사 요청문으로 다시 받아 주세요.');
 }
 
+function researchImportError(issues: z.ZodIssue[]): string {
+  const sections: Record<string, string> = {
+    contract: '응답 버전', requestId: '요청 ID', entity: '조사 대상', sources: '출처',
+    claims: '주장', questions: '고객 질문', questionClusters: '질문 묶음',
+    unmetNeeds: '미충족 요구', productCandidates: '제품 후보', existingContent: '기존 콘텐츠',
+    comparisons: '경쟁 비교', recommendations: '추천 이유', missingEvidence: '추가 확인 사항',
+  };
+  const fields: Record<string, string> = {
+    name: '이름', model: '모델명', verdict: '판단 표기', url: '링크',
+    ref: '자료 번호', sourceRef: '출처 번호', quote: '인용문', sourceRefs: '출처 번호',
+    ownClaimRefs: '자사 주장 번호', otherClaimRefs: '비교 대상 주장 번호',
+    claimRefs: '주장 번호', comparisonRefs: '비교 번호', questionRefs: '질문 번호',
+  };
+  const descriptions = issues.slice(0, 5).map(issue => {
+    const [section, index, field] = issue.path;
+    const prefix = sections[String(section)] || '입력';
+    const position = typeof index === 'number' ? ` ${index + 1}번` : '';
+    const name = fields[String(typeof index === 'number' ? field : index)] || '내용';
+    return `${prefix}${position}의 ${name}`;
+  });
+  return `조사 응답에서 확인할 항목이 있어요: ${descriptions.join(' · ')}${issues.length > 5 ? ` 외 ${issues.length - 5}건` : ''}. 붙여넣은 내용은 보관돼 있어요.`;
+}
+
+function validateResearchRefs(data: ResearchImport | ResearchV2Import): void {
+  const sources = new Set(data.sources.map(x => x.ref));
+  const claims = new Set(data.claims.map(x => x.ref));
+  const questions = new Set(data.questions.map(x => x.ref));
+  const comparisons = new Set(data.comparisons.map(x => x.ref));
+  const missing: string[] = [];
+  const check = (refs: string[], available: Set<string>, location: string) => {
+    for (const ref of refs) if (!available.has(ref)) missing.push(`${location}의 ${ref}`);
+  };
+  for (const x of data.claims) check(x.sourceRef ? [x.sourceRef] : [], sources, `주장 ${x.ref} 출처`);
+  for (const x of data.questions) check(x.sourceRefs, sources, `질문 ${x.ref} 출처`);
+  if (data.contract === 'alc.research.v2') {
+    for (const x of data.questionClusters) check(x.questionRefs, questions, `질문 묶음 ${x.label}`);
+    for (const x of data.unmetNeeds) check(x.sourceRefs, sources, `미충족 요구 ${x.situation}`);
+  }
+  for (const x of data.comparisons) {
+    check(x.ownClaimRefs, claims, `비교 ${x.ref} 자사 주장`);
+    check(x.otherClaimRefs, claims, `비교 ${x.ref} 비교 대상 주장`);
+  }
+  for (const x of data.recommendations) {
+    check(x.claimRefs, claims, `추천 ${x.ref} 주장`);
+    check(x.comparisonRefs, comparisons, `추천 ${x.ref} 비교`);
+  }
+  if (missing.length) throw new ImportError(`조사 응답의 연결 번호를 확인해 주세요: ${missing.slice(0, 5).join(' · ')}${missing.length > 5 ? ` 외 ${missing.length - 5}건` : ''}. 붙여넣은 내용은 보관돼 있어요.`);
+}
+
 export function importResearch(project: Project, response: string, confirmSameEntity = false): Project {
   const raw = parseResponse(response);
   const parsed = (raw && typeof raw === 'object' && 'contract' in raw && raw.contract === 'alc.research.v2' ? researchV2Schema : researchImportSchema).safeParse(raw);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    if (issue?.path.at(-1) === 'verdict') {
-      throw new ImportError(`경쟁 비교 ${Number(issue.path[1]) + 1}번의 판단 표기를 읽지 못했어요. 조사 요청문에 맞춰 다시 받아 주세요.`);
-    }
-    throw new ImportError(`조사 응답에서 필요한 항목을 찾지 못했어요: ${issue?.path.join('.') || '형식'}`);
-  }
+  if (!parsed.success) throw new ImportError(researchImportError(parsed.error.issues));
   const data: ResearchImport | ResearchV2Import = parsed.data;
   const priorReceipt = project.importReceipts.find(r => r.requestId === data.requestId && r.contract === data.contract);
   if (priorReceipt?.responseHash === fingerprint(response)) return project;
@@ -121,6 +164,7 @@ export function importResearch(project: Project, response: string, confirmSameEn
   }
   if (!data.sources.length && !data.claims.length && !data.recommendations.length) throw new ImportError('응답에 조사 자료가 없습니다. 공식 자료나 제품 설명을 추가해 주세요.');
   [data.sources, data.claims, data.questions, data.comparisons, data.recommendations].forEach(uniqueRefs);
+  validateResearchRefs(data);
   const now = new Date().toISOString();
   const sourceIds = new Map(data.sources.map(x => [x.ref, crypto.randomUUID()]));
   const questionIds = new Map(data.questions.map(x => [x.ref, crypto.randomUUID()]));
@@ -135,15 +179,18 @@ export function importResearch(project: Project, response: string, confirmSameEn
     retrieval: 'user_provided', origin: 'external_response', collectedAt: now,
     externalAiAllowed: true, publicationAllowed: false,
     publisher: x.publisher ?? null, publishedAt: x.publishedAt ?? null,
-    duplicateGroupId: fingerprint(normalize(x.excerpt)), hash: fingerprint(x.excerpt),
+    duplicateGroupId: fingerprint(x.url || normalize(x.excerpt)), hash: fingerprint(x.excerpt),
   }));
+  const otherOnlyClaimRefs = new Set(data.comparisons.filter(c =>
+    !normalize(c.competitor).includes(normalize(project.name))).flatMap(c => c.otherClaimRefs)
+    .filter(ref => !data.comparisons.some(c => c.ownClaimRefs.includes(ref))));
   const claims: Claim[] = data.claims.map(x => {
     const sourceId = x.sourceRef ? requireRef(sourceIds, x.sourceRef) : null;
     return {
       id: requireRef(claimIds, x.ref), projectId: project.id, statement: x.statement,
       sourceId, quote: x.quote, conditions: x.conditions, subject: x.subject || project.name,
       status: 'unreviewed', reviewedBy: null,
-      target: data.comparisons.some(c => c.otherClaimRefs.includes(x.ref)) ? 'competitor' : 'own',
+      target: otherOnlyClaimRefs.has(x.ref) ? 'competitor' : 'own',
     };
   });
   const unmatchedQuotes = data.claims.filter(x => {
@@ -162,6 +209,10 @@ export function importResearch(project: Project, response: string, confirmSameEn
     productCandidates: data.productCandidates,
     existingContent: data.existingContent,
   } : { questionClusters: [], unmetNeeds: [], productCandidates: [], existingContent: [] };
+  const unrecognizedVerdicts = data.comparisons.filter(x => ![
+    'advantage', 'common', 'unknown', 'weakness', 'own_advantage', 'competitor_advantage',
+    'manufacturer_claim_only', 'conditional',
+  ].includes(x.verdict)).map(x => `경쟁 비교 ${x.ref}의 판단 표기는 별도로 해석하지 않았습니다. 원문과 조건을 확인해 주세요.`);
   const comparisons = data.comparisons.map(x => ({
     id: requireRef(comparisonIds, x.ref), competitor: x.competitor, criterion: x.criterion,
     ownClaimIds: x.ownClaimRefs.map(ref => requireRef(claimIds, ref)),
@@ -182,13 +233,13 @@ export function importResearch(project: Project, response: string, confirmSameEn
       [...project.analysisHistory, { inputRevision: project.inputRevision, evidenceRevision: project.evidenceRevision,
         at: now, questions: project.questions, comparisons: project.comparisons,
         recommendations: project.recommendations, researchInsights: project.researchInsights }] : project.analysisHistory,
-    questions, comparisons, recommendations, researchInsights, missingEvidence: [...data.missingEvidence, ...unmatchedQuotes],
+    questions, comparisons, recommendations, researchInsights, missingEvidence: [...data.missingEvidence, ...unmatchedQuotes, ...unrecognizedVerdicts],
     importReceipts: [...project.importReceipts, { requestId: data.requestId, contract: data.contract, responseHash: fingerprint(response), at: now }],
     documents: documents as Project['documents'], evidenceRevision: project.evidenceRevision + 1,
     manualResearchRequestId: null, manualContentRequestId: null,
     migrationNote: [
       confirmSameEntity ? `사용자가 같은 대상으로 확인한 조사 이름: ${data.entity.name} (현재 작업: ${project.name}). 이 확인은 출처·주장의 검증을 뜻하지 않습니다.` : '',
-      data.missingEvidence.length || unmatchedQuotes.length ? `추가 확인: ${[...data.missingEvidence, ...unmatchedQuotes].join(' · ')}` : '',
+      data.missingEvidence.length || unmatchedQuotes.length || unrecognizedVerdicts.length ? `추가 확인: ${[...data.missingEvidence, ...unmatchedQuotes, ...unrecognizedVerdicts].join(' · ')}` : '',
     ].filter(Boolean).join('\n') || project.migrationNote,
   };
 }

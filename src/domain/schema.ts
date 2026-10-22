@@ -107,7 +107,7 @@ export const projectSchema = z.object({
     approvedAt: null, feedbackHistory: [] }),
   researchInsights: z.object({ questionClusters: z.array(z.object({ label: z.string(), questionIds: z.array(id) })),
     unmetNeeds: z.array(z.object({ situation: z.string(), need: z.string(), provenance: z.enum(['observed', 'reconstructed', 'hypothesis']), sourceIds: z.array(id) })),
-    productCandidates: z.array(z.object({ name: z.string(), model: z.string(), category: z.string(), status: z.string() })),
+    productCandidates: z.array(z.object({ name: z.string(), model: z.string().nullable(), category: z.string(), status: z.string() })),
     existingContent: z.array(z.object({ title: z.string(), url: z.string().nullable(), gap: z.string() })),
   }).default({ questionClusters: [], unmetNeeds: [], productCandidates: [], existingContent: [] }),
   questionAnswers: z.array(z.object({ id, questionId: id, answer: z.string(), claimIds: z.array(id),
@@ -187,10 +187,9 @@ export const researchImportSchema = z.object({
   comparisons: z.array(z.object({
     ref: id, competitor: shortText, criterion: shortText,
     ownClaimRefs: z.array(id), otherClaimRefs: z.array(id), comparable: z.boolean(),
-    // Accept the external response's qualified manufacturer label as input only.
-    // importResearch resets every external comparison to unknown until reviewed.
-    verdict: z.enum(['advantage', 'common', 'unknown', 'weakness', 'own_advantage', 'competitor_advantage', 'manufacturer_claim_only'])
-      .transform(value => value === 'own_advantage' ? 'advantage' as const : value === 'competitor_advantage' ? 'weakness' as const : value === 'manufacturer_claim_only' ? 'unknown' as const : value),
+    // External AI labels are descriptive input, never an approved verdict.
+    // Accept new nonempty labels without silently promoting a comparison.
+    verdict: z.string().trim().min(1).max(100),
     reason: z.string().max(3000),
   })),
   recommendations: z.array(z.object({
@@ -208,7 +207,7 @@ export const researchV2Schema = researchImportSchema.extend({
   })),
   questionClusters: z.array(z.object({ label: z.string(), questionRefs: z.array(id) })).default([]),
   unmetNeeds: z.array(z.object({ situation: z.string(), need: z.string(), provenance: z.enum(['observed', 'reconstructed', 'hypothesis']), sourceRefs: z.array(id) })).default([]),
-  productCandidates: z.array(z.object({ name: z.string(), model: z.string(), category: z.string(), status: z.string() })).default([]),
+  productCandidates: z.array(z.object({ name: z.string(), model: z.string().nullable(), category: z.string(), status: z.string() })).default([]),
   existingContent: z.array(z.object({ title: z.string(), url: webUrl.nullable(), gap: z.string() })).default([]),
 });
 export type ResearchV2Import = z.infer<typeof researchV2Schema>;

@@ -138,22 +138,49 @@ it('제조사 발표만 있는 v2 비교를 자료와 함께 가져오되 경쟁
   expect(imported.questions).toHaveLength(1);
   expect(imported.researchInsights.questionClusters[0].questionIds).toEqual([imported.questions[0].id]);
   expect(imported.researchInsights.unmetNeeds[0].sourceIds).toEqual([imported.sources[0].id]);
-  expect(imported.comparisons).toHaveLength(1);
-  expect(imported.comparisons[0]).toMatchObject({ comparable: false, verdict: 'unknown' });
+  expect(imported.comparisons).toHaveLength(2);
+  expect(imported.comparisons.every(c => !c.comparable && c.verdict === 'unknown')).toBe(true);
   expect(imported.comparisons[0].reason).toContain('제조사 발표만');
+  expect(imported.comparisons[1].reason).toContain('옵션 선택에 따라');
+  expect(imported.researchInsights.productCandidates[1].model).toBeNull();
+  expect(imported.sources[0].duplicateGroupId).toBe(imported.sources[1].duplicateGroupId);
   expect(imported.recommendations[0].claimIds).toEqual([imported.claims[0].id]);
-  expect(imported.recommendations[0].comparisonIds).toEqual([imported.comparisons[0].id]);
+  expect(imported.recommendations[0].comparisonIds).toEqual(imported.comparisons.map(c => c.id));
   expect(imported.claims.every(c => c.status === 'unreviewed')).toBe(true);
+  expect(imported.claims[1].target).toBe('own');
   expect(imported.sources.every(s => s.origin === 'external_response' && !s.publicationAllowed)).toBe(true);
   expect(imported.missingEvidence.join(' ')).toContain('인용문이 일치하지 않음: C2');
   expect(importResearch(imported, raw)).toBe(imported);
 });
 
-it('정의되지 않은 비교 판단은 한국어 안내와 함께 거절하고 원본을 보존한다', () => {
+it('새 비교 판단 표기는 내용을 버리지 않고 보류하며 잘못된 필드 여러 개를 한꺼번에 안내한다', () => {
   const started = prepareResearch(base()).project;
   const fixture = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/manual/research.manufacturer-claim-only.json'), 'utf8'));
   fixture.requestId = started.manualResearchRequestId;
   fixture.comparisons[0].verdict = 'unrecognized_label';
-  expect(() => importResearch(started, JSON.stringify(fixture))).toThrow('경쟁 비교 1번의 판단 표기를 읽지 못했어요');
+  const imported = importResearch(started, JSON.stringify(fixture));
+  expect(imported.comparisons[0].verdict).toBe('unknown');
+  expect(imported.missingEvidence.join(' ')).toContain('경쟁 비교 K1의 판단 표기');
+  fixture.comparisons[0].verdict = 123;
+  fixture.productCandidates[0].model = { text: 'A' };
+  expect(() => importResearch(started, JSON.stringify(fixture))).toThrow(/경쟁 비교 1번의 판단 표기 · 제품 후보 1번의 모델명|제품 후보 1번의 모델명 · 경쟁 비교 1번의 판단 표기/);
+  expect(started.sources).toHaveLength(0);
+});
+
+it('서로 다른 섹션의 잘못된 연결 번호를 모아 안내하고 아무 자료도 반영하지 않는다', () => {
+  const started = prepareResearch(base()).project;
+  const fixture = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/manual/research.manufacturer-claim-only.json'), 'utf8'));
+  fixture.requestId = started.manualResearchRequestId;
+  fixture.claims[0].sourceRef = 'S99';
+  fixture.questionClusters[0].questionRefs = ['Q99'];
+  fixture.recommendations[0].comparisonRefs = ['K99'];
+  try {
+    importResearch(started, JSON.stringify(fixture));
+    throw new Error('잘못된 번호를 가져와서는 안 됩니다.');
+  } catch (error) {
+    expect((error as Error).message).toContain('S99');
+    expect((error as Error).message).toContain('Q99');
+    expect((error as Error).message).toContain('K99');
+  }
   expect(started.sources).toHaveLength(0);
 });
