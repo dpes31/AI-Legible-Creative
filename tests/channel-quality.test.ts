@@ -45,5 +45,6 @@ describe('채널별 본문 완성도', () => {
     const checked = validateDocument(project, doc);
     expect(channelCompleteness(project, checked).complete).toBe(false);
     expect(checked.warnings.join(' ')).toContain('본문');
+    expect(checked.warnings.join(' ')).toContain('확인된 세부 기능');
   });
 });

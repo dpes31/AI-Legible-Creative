@@ -30,6 +30,12 @@ export function channelCompleteness(project: Project, document: ChannelDocument)
   const substantive = body.filter(b => !/(?:작성해\s*주세요|넣어\s*주세요|추가해\s*주세요|확인해\s*보세요|내용\s*확인|추후\s*작성)/.test(b.text));
   const missing: string[] = [];
   if (!substantive.length) missing.push('제품과 고객 질문에 답하는 본문이 없습니다. 작성 지시와 확인 요청 대신 실제 설명을 써 주세요.');
+  const grounded = substantive.filter(block => block.claimRefs.some(ref => project.claims.some(claim => claim.id === ref && claim.status === 'supported' &&
+    claim.target !== 'competitor' && project.sources.some(source => source.id === claim.sourceId && source.publicationAllowed && source.origin !== 'external_response'))));
+  if (!grounded.length) missing.push('제품의 확인된 세부 기능·조건을 설명하는 본문이 없습니다. 일반적인 선택 안내만으로는 완성 원고가 아닙니다.');
+  if (['product_page', 'blog', 'youtube_description'].includes(document.channel) && project.questions.length &&
+      !substantive.some(block => block.questionRefs?.some(ref => project.questions.some(question => question.id === ref))))
+    missing.push('어떤 고객 질문에 답하는지 본문 구간을 연결해 주세요. 질문 목록만 나열하지 마세요.');
   switch (document.channel) {
     case 'ad_copy':
       if (headings.length < 3 || publicBlocks.filter(b => b.kind === 'cta').length < 3)

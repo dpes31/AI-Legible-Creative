@@ -25,6 +25,8 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   test.setTimeout(120000);
   await page.goto('/');
   await page.getByLabel('무엇을 알리고 싶으신가요?').fill('가상 브랜드 솔담 보온컵');
+  await page.getByText('자료 더하기 · 결과물 선택', { exact: false }).click();
+  await page.getByLabel('후기 영상 핵심 문구').check();
   await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
   await expect(page.getByRole('heading', { name: '브랜드 분석: 가상 브랜드 솔담 보온컵' })).toBeVisible();
   await page.getByRole('button', { name: '조사 요청문 만들기' }).click();

@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { channels, channelNames, newProject, type Channel, type Objective, type ProductCategory } from '@/domain/schema';
-import { listBrandProfiles, loadBriefDraft, moveBriefDraft, preserveConflictDraft, RevisionConflict, saveBrandProfile, saveBriefDraft, type BriefDraft } from '@/data/repository';
+import { listBrandProfiles, loadBriefDraft, loadProject, moveBriefDraft, preserveConflictDraft, RevisionConflict, saveBrandProfile, saveBriefDraft, type BriefDraft } from '@/data/repository';
 import { newBrandProfile, type BrandProfile } from '@/domain/portfolio';
 import { useWorkspace } from '@/features/workspace/WorkspaceProvider';
 import styles from '@/features/brief/BriefStart.module.css';
+
+const defaultChannels = channels.filter(channel => channel !== 'review_video');
 
 export default function Home() {
   const router = useRouter();
@@ -24,7 +26,7 @@ export default function Home() {
   const [audience, setAudience] = useState('');
   const [audienceUndecided, setAudienceUndecided] = useState(true);
   const [officialUrl, setOfficialUrl] = useState('');
-  const [selectedChannels, setSelectedChannels] = useState<Channel[]>([...channels]);
+  const [selectedChannels, setSelectedChannels] = useState<Channel[]>([...defaultChannels]);
   const [mode, setMode] = useState<'manual' | 'automatic'>('manual');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -125,6 +127,12 @@ export default function Home() {
         brandName: brandName.trim(), category, youtubePrefix: youtubePrefix || null, brandRuleRevision: selectedBrand?.revision || 0 };
       if (editing && project && project.name === input.name && project.kind === input.kind && project.model === input.model &&
           project.brandId === input.brandId) {
+        const latest = await loadProject(project.id);
+        if (!latest || latest.revision !== project.revision) {
+          const recoveryId = crypto.randomUUID();
+          await preserveConflictDraft(recoveryId, { ...project, ...input });
+          throw new RevisionConflict(recoveryId);
+        }
         const analyticalChange = project.objective !== input.objective || project.audience !== input.audience ||
           project.audienceUndecided !== input.audienceUndecided || project.description !== input.description ||
           project.officialUrl !== input.officialUrl || project.category !== input.category;
@@ -167,7 +175,7 @@ export default function Home() {
         setModel(saved?.input.model || ''); setDescription(saved?.input.description || ''); setOfficialUrl(saved?.input.officialUrl || '');
         setBrandId(saved?.input.brandId ?? null); setBrandName(saved?.input.brandName || ''); setCategory(saved?.input.category || 'unknown');
         setObjective(saved?.input.objective || 'sales'); setAudience(saved?.input.audience || '');
-        setAudienceUndecided(saved?.input.audienceUndecided ?? true); setSelectedChannels(saved?.input.selectedChannels || [...channels]);
+        setAudienceUndecided(saved?.input.audienceUndecided ?? true); setSelectedChannels(saved?.input.selectedChannels || [...defaultChannels]);
         setMode(saved?.input.mode || 'manual'); setEditing(false); setMessage('새 작업의 입력을 보관합니다. 기존 작업은 그대로 남아 있어요.'); setDraftReady(true);
       })(); }}>새 작업 시작</button>
     </div>}
@@ -179,7 +187,7 @@ export default function Home() {
         <div className={styles.process} aria-label="문구를 만드는 기준">
           <div><span className={styles.processMark} aria-hidden="true">01</span><p><strong>사실을 확인하고</strong><span>원문과 조건을 함께 살펴봅니다.</span></p></div>
           <div><span className={styles.processMark} aria-hidden="true">02</span><p><strong>선택할 이유를 찾고</strong><span>고객에게 의미 있는 차이를 정리합니다.</span></p></div>
-          <div><span className={styles.processMark} aria-hidden="true">03</span><p><strong>채널에 맞춰 씁니다</strong><span>같은 근거로, 용도에 맞는 여섯 가지 문구.</span></p></div>
+          <div><span className={styles.processMark} aria-hidden="true">03</span><p><strong>채널에 맞춰 씁니다</strong><span>다섯 기본 문서와 선택한 후기 영상까지.</span></p></div>
         </div>
         <p className={styles.localNote}>현재 작업은 이 브라우저에 저장됩니다.<br /><Link href="/settings">설정에서 백업 파일 받기</Link></p>
       </section>
@@ -246,7 +254,7 @@ export default function Home() {
       </fieldset>
     </form>
     </div>
-    <section className={styles.deliverables} aria-labelledby="deliverables-heading"><div><p className="eyebrow">필요한 채널에 바로</p><h2 id="deliverables-heading">하나의 분석, 여섯 가지 문구</h2><p className="muted small">각각 수정하고, 필요한 문구만 복사하세요.</p></div>
+    <section className={styles.deliverables} aria-labelledby="deliverables-heading"><div><p className="eyebrow">필요한 채널에 바로</p><h2 id="deliverables-heading">하나의 분석, 필요한 문구로</h2><p className="muted small">다섯 기본 채널과 선택할 수 있는 후기 영상. 각각 수정하고 복사하세요.</p></div>
       <ul>{channels.map((channel, index) => <li key={channel}><span aria-hidden="true">0{index + 1}</span>{channelNames[channel]}</li>)}</ul>
     </section>
   </>;
