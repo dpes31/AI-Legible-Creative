@@ -6,6 +6,7 @@
 - 외부 AI의 비교 판단 표기는 길이를 제한한 문자열 입력으로만 받고, 내부 비교는 원문 검토 전 전부 `unknown`·비교 미확인으로 보관한다. 알 수 없는 표기는 자료 보완 항목으로 표시한다. 제품 후보의 미확인 모델은 `null`로 보존한다. 값이 잘못된 필드가 여럿이면 최대 5개를 한꺼번에 한국어로 알린다. 잘못된 출처·주장·비교 참조도 적용 전에 모아 안내해 일부 관계를 추측해서 잇지 않는다.
 - 같은 공식 URL의 여러 발췌를 같은 출처 계열로 묶고, 한 제품의 일반형/허리맞춤형을 서로 비교할 때 양쪽에 등장한 주장을 타사 주장으로 잘못 분류하지 않는다. 형식 가져오기 성공은 공식 링크 직접 열람, 사실 의미, 제품별 성능 확인을 뜻하지 않는다.
 - 사용자 조사 내용은 공개 fixture로 복사하지 않았다. 허구 fixture에서 첫/둘째 비교(`manufacturer_claim_only`/`conditional`), 미확인 모델(`null`), 동일 URL, 옵션 내부 주장, 미등록 판단값, 잘못된 필드와 다중 참조 오류까지 검사했다. 로컬 lint/typecheck/단위 55개 통과. 빌드 첫 시도는 손상된 임시 Turbopack 캐시로 실패, 캐시를 별도 위치로 옮긴 뒤 재실행해 성공. **최종 코드 변경의 원격 Chromium/WebKit E2E와 Preview는 새 커밋에서 별도 확인한다.**
+- 기능 원격 SHA `aa17fc5be987814af8b4da51b8d7fb7422750b99`의 [CI 39762641621](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39762641621): npm ci, lint, typecheck, Vitest 55개, Chromium·WebKit E2E 12개, build 모두 통과. [보호된 Preview](https://ai-legible-creative-f4n16s7p1-dpes31s-projects.vercel.app/) READY. 실제 제공된 URL의 본문과 모델별 성능 검증, 실제 iPhone Safari는 미실행.
 
 ## 2026-10-22 실제 v2 조사 응답 가져오기 회귀
 
