@@ -21,6 +21,46 @@ test('입력 중 이동·새로고침과 분석 후 복귀에도 값이 유지�
   await expect(page.getByRole('heading', { name: '브랜드 분석: 허구 저장 시험 의자' })).toBeVisible();
 });
 
+test('질문별 분석과 같은 출처의 발췌를 한 번에 살펴보고 검토용 작성으로 이동한다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByLabel('무엇을 알리고 싶으신가요?').fill('가상 트리플체어');
+  await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
+  await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
+  const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
+  expect(prompt).toContain('alc.research.v3');
+  const requestId = prompt.match(/요청 ID: ([\w-]+)/)?.[1];
+  expect(requestId).toBeTruthy();
+  const research = { contract: 'alc.research.v3', requestId, entity: { name: '가상 트리플체어' },
+    sources: [
+      { ref: 'S1', title: '가상 설명서 기능', url: 'https://example.org/chair', excerpt: '일반형 A는 등 안마를 제공합니다.', sourceType: 'official' },
+      { ref: 'S2', title: '가상 설명서 옵션', url: 'https://example.org/chair', excerpt: '허리형 B는 목 안마를 제공합니다.', sourceType: 'official' },
+    ], claims: [
+      { ref: 'C1', statement: '일반형 A 등 안마', sourceRef: 'S1', quote: '일반형 A는 등 안마를 제공합니다.', subject: '가상 트리플체어 일반형 A', conditions: '일반형 A' },
+      { ref: 'C2', statement: '허리형 B 목 안마', sourceRef: 'S2', quote: '허리형 B는 목 안마를 제공합니다.', subject: '가상 트리플체어 허리형 B', conditions: '허리형 B' },
+    ], questions: [{ ref: 'Q1', text: '등 안마는 어느 모델인가요?', provenance: 'reconstructed', sourceRefs: ['S1'],
+      situation: '모델 선택', need: '정확한 안마 범위', painPoint: '모델 혼동', decisionCriteria: ['안마 부위'] }],
+    comparisons: [], recommendations: [], missingEvidence: [],
+    answerPlans: [{ questionRef: 'Q1', directAnswer: '일반형 A의 등 안마는 확인 후보입니다.', applicableModel: '일반형 A',
+      alternatives: ['허리형 B'], selectionReason: '안마 범위를 우선', limitations: '허리형 B로 일반화 금지',
+      contentGap: '모델 선택 안내 부족', claimRefs: ['C1'], comparisonRefs: [],
+      channels: [{ channel: 'product_page', angle: '옵션별 선택표', depth: '안마 부위와 조건' }] }],
+  };
+  await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
+  await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
+  await expect(page.getByText('일반형 A의 등 안마는 확인 후보입니다.')).toBeVisible();
+  await page.getByText('자료와 근거 살펴보기', { exact: false }).click();
+  await expect(page.getByRole('textbox', { name: '이 출처의 실제 본문 또는 관련 원문 구간' })).toHaveCount(1);
+  await page.getByLabel('수정할 방향').fill('일반형 A를 먼저 설명해 주세요.');
+  await page.getByRole('button', { name: '이 방향으로 작성 요청문 만들기' }).click();
+  await expect(page).toHaveURL(/\/results$/);
+  const writing = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
+  expect(writing).toContain('옵션별 선택표');
+  expect(writing).toContain('일반형 A를 먼저 설명해 주세요.');
+  expect(writing).toContain('unverified_candidate');
+  expect(writing).toContain('가상 트리플체어 일반형 A');
+});
+
 test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 연다', async ({ page }, testInfo) => {
   test.setTimeout(120000);
   await page.goto('/');
@@ -37,9 +77,9 @@ test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 �
   research.requestId = researchId;
   await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
   await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
-  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '고객 질문별 답변과 채널 계획' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('research-fictional-fixture.png'), fullPage: true });
-  await page.getByText('근거 확인하기', { exact: false }).first().click();
+  await page.getByText('자료와 근거 살펴보기', { exact: false }).first().click();
   await expect(page.getByRole('heading', { name: '뚜껑을 돌려 닫는 구조', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '자료 보완용 구성안 요청문 만들기' }).click();
   await expect(page).toHaveURL(/\/results$/);
@@ -179,16 +219,14 @@ test('실제 제품 응답의 이름 차이와 우위 표기를 버튼 옆에서
   await expect(page.locator('#research-import-error')).toContainText('조사 응답: 코웨이 트리플체어2 슬림');
   await expect(page.getByLabel('AI에서 받은 조사 결과 붙여넣기')).toHaveValue(response);
   await page.getByRole('button', { name: '같은 제품임을 확인하고 가져오기' }).click();
-  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '고객 질문별 답변과 채널 계획' })).toBeVisible();
   const nextStep = page.locator('section[aria-labelledby="next-step-heading"]');
-  await expect(nextStep).toContainText('원문 확인 필요 2개');
+  await expect(nextStep).toContainText('사실 후보 1개');
   await expect(page.getByText('위에서 인사이트 방향을 확인하면 작성 요청문을 만들 수 있습니다.')).toHaveCount(0);
-  await expect(nextStep.getByRole('button', { name: '원문 확인하고 작성하기' })).toBeVisible();
+  await expect(nextStep.getByRole('button', { name: '이 방향으로 작성 요청문 만들기' })).toBeEnabled();
   await expect(page.getByRole('button', { name: '이 방향으로 작성', exact: true })).toHaveCount(0);
-  await nextStep.getByRole('button', { name: '원문 확인하고 작성하기' }).click();
+  await page.getByText('자료와 근거 살펴보기', { exact: false }).click();
   await expect(page.locator('#evidence')).toHaveAttribute('open', '');
-  await expect(page.locator('#evidence')).toBeFocused();
-  await expect(page).toHaveURL(/\/review$/);
   await expect(page.locator('section[aria-labelledby="analysis-summary"]').getByText('인용문이 일치하지 않음: C2', { exact: false })).toBeVisible();
   await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
@@ -208,13 +246,13 @@ test('제조사 발표만 있는 v2 비교도 나머지 조사 내용을 잃지 
   research.requestId = requestId;
   await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
   await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
-  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '고객 질문별 답변과 채널 계획' })).toBeVisible();
   await expect(page.locator('section[aria-labelledby="analysis-summary"]').getByText('인용문이 일치하지 않음: C2', { exact: false })).toBeVisible();
   await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
   await expect(page.locator('ul.list').getByText('기존 제품보다 얼마나 더 담을 수 있나요?')).toBeVisible();
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
   await page.reload();
-  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '고객 질문별 답변과 채널 계획' })).toBeVisible();
 });
 
 test('원문을 확인한 뒤 작성 버튼 한 번으로 현재 요청문을 열고 수정 방향을 보존한다', async ({ page }) => {
@@ -229,13 +267,14 @@ test('원문을 확인한 뒤 작성 버튼 한 번으로 현재 요청문을 �
   await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
   await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
   await page.getByLabel('수정할 방향').fill('뚜껑을 닫는 방법을 먼저 설명해 주세요.');
-  await page.getByRole('button', { name: '원문 확인하고 작성하기' }).click();
+  await page.getByText('자료와 근거 살펴보기', { exact: false }).click();
   const evidence = page.locator('#evidence');
   await expect(evidence).toHaveAttribute('open', '');
-  await evidence.getByLabel('AI가 제시한 인용문입니다. 실제 원문을 열어 본문을 붙여넣어 주세요.').fill('솔담 보온컵은 뚜껑을 돌려 닫는 구조입니다.');
-  await evidence.getByLabel('공개 문구의 근거로 사용해도 됩니다').check();
-  await evidence.getByRole('button', { name: '원문 연결하기' }).click();
-  await evidence.getByRole('button', { name: '원문과 직접 대조했어요' }).click();
+  await evidence.getByLabel('이 출처의 실제 본문 또는 관련 원문 구간').fill('솔담 보온컵은 뚜껑을 돌려 닫는 구조입니다.');
+  await evidence.getByLabel('공개 문구의 근거로 사용할 권한이 있습니다').check();
+  await evidence.getByRole('button', { name: '이 출처 한 번 연결하기' }).click();
+  await evidence.getByText('이 주장의 의미와 모델 조건 검토').click();
+  await evidence.getByRole('button', { name: '원문과 의미를 직접 대조했어요' }).click();
   await expect(page.getByRole('button', { name: '이 방향으로 작성 요청문 만들기' })).toBeVisible();
   await page.getByRole('button', { name: '이 방향으로 작성 요청문 만들기' }).click();
   await expect(page).toHaveURL(/\/results$/);

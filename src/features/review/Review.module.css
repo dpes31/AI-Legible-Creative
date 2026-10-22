@@ -22,6 +22,10 @@
 .fold[open] { padding-bottom:22px; }
 .claim { border-top:1px solid var(--line); padding:22px 0; }
 .claim h3 { font-weight:700; margin-bottom:8px; }
+.answerCard { padding:15px 0; border-bottom:1px solid var(--line); min-width:0; overflow-wrap:anywhere; }
+.answerCard:first-child { padding-top:0; }
+.answerCard:last-child { border-bottom:0; }
+.answerCard p { margin:7px 0 0; }
 .claim blockquote { margin:16px 0; padding:16px 20px; background:var(--paper); border-left:2px solid var(--line); }
 .next { display:flex; align-items:center; gap:20px; justify-content:space-between; margin:28px 0; }
 .next p { font-size:13px; color:var(--muted); margin:0; }

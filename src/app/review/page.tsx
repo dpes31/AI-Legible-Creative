@@ -25,6 +25,12 @@ export default function ReviewPage() {
   const hasAnalysis = !!(project.claims.length || project.questions.length || project.recommendations.length);
   const unreviewed = project.claims.filter(c => c.status !== 'supported').length;
   const usableEvidence = hasUsableEvidence(project);
+  const draftCandidates = project.claims.filter(c => c.status === 'unreviewed' && c.target === 'own' && !!c.quote &&
+    project.sources.some(s => s.id === c.sourceId && !!s.excerpt && s.externalAiAllowed)).length;
+  const sourceGroups = project.sources.filter(s => s.origin === 'external_response').filter((source, index, sources) =>
+    sources.findIndex(item => item.id === source.id || (source.url && source.url === item.url &&
+      source.duplicateGroupId === item.duplicateGroupId && source.collectedAt === item.collectedAt &&
+      source.publishedAt === item.publishedAt)) === index);
   const continueToWriting = async (outline: boolean) => {
     if (advancing) return;
     setAdvancing(true);
@@ -38,10 +44,6 @@ export default function ReviewPage() {
     } catch (cause) {
       setInsightError(cause instanceof Error ? cause.message : '작성 요청문을 만들지 못했어요. 다시 시도해 주세요.');
     } finally { setAdvancing(false); }
-  };
-  const openEvidence = () => {
-    const evidence = document.getElementById('evidence') as HTMLDetailsElement | null;
-    if (evidence) { evidence.open = true; evidence.scrollIntoView({ block: 'start' }); evidence.focus(); }
   };
   const confirmClaim = (id: string) => {
     try { update(verifyClaim(project, id)); setError(''); setNotice('원문과 주장을 직접 대조한 기록을 남겼습니다.'); }
@@ -65,7 +67,20 @@ export default function ReviewPage() {
         {insightCurrent(project) && <p role="status" className="small">승인한 방향 {project.insight.revision} · 입력 {project.insight.inputRevision} · 근거 {project.insight.evidenceRevision} 버전</p>}
       </section>
     </> : <section className="card"><span className="eyebrow">첫 번째 요청 · 조사</span><h2>어떤 점을 알리면 좋을지 찾아봅니다.</h2><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></section>}
-    <details className={styles.fold} id="evidence" tabIndex={-1}><summary>근거 확인하기 <span>주장 {project.claims.length}개 · 원문 확인 필요 {unreviewed}개</span></summary>
+    <details className={styles.fold} id="evidence" tabIndex={-1}><summary>자료와 근거 살펴보기 <span>출처 {project.sources.length}건 · 검토할 주장 {unreviewed}개</span></summary>
+      <p className="small muted">아래 인용은 외부 AI가 제안한 확인 후보입니다. 출처별 원문 연결은 선택 작업이며 작성 요청문을 먼저 만들 수 있습니다. 미확인 사실은 검토용 초안에만 사용합니다.</p>
+      {sourceGroups.map(source => <section className={styles.claim} key={source.id}>
+        <h3>{source.title}</h3><p className="small muted">같은 주소의 발췌를 한 번에 확인합니다. 원문 연결은 인용문 존재 검사이며 사실의 의미 검증이 아닙니다.</p>
+        {source.url && <a href={source.url} target="_blank" rel="noreferrer" className="source-link">자료 열기 ↗</a>}
+        <div className="field"><label htmlFor={`original-${source.id}`}>이 출처의 실제 본문 또는 관련 원문 구간</label>
+          <textarea id={`original-${source.id}`} value={originals[source.id] || ''} onChange={e => setOriginals(old => ({ ...old, [source.id]: e.target.value }))} />
+          <label className="row"><input type="checkbox" checked={publication[source.id] || false} onChange={e => setPublication(old => ({ ...old, [source.id]: e.target.checked }))} />공개 문구의 근거로 사용할 권한이 있습니다</label>
+          <button type="button" className="button secondary" onClick={() => {
+            try { update(attachOriginalText(project, source.id, originals[source.id] || '', publication[source.id] || false)); setError(''); setNotice('같은 출처의 원문을 연결했습니다. 인용 일치와 의미 확인 결과는 구분됩니다.'); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : '원문을 확인하지 못했어요.'); }
+          }}>이 출처 한 번 연결하기</button>
+        </div>
+      </section>)}
       {!project.claims.length && <p className="muted">조사 응답을 가져오면 문장별 출처와 조건을 함께 볼 수 있습니다.</p>}
       {project.claims.map(claim => { const source = project.sources.find(s => s.id === claim.sourceId);
         const label = claim.status === 'supported' ? '직접 대조함' : claim.status === 'contradicted' ? '상충하는 근거' : claim.status === 'insufficient' ? '근거 부족' : '원문 확인 필요';
@@ -74,16 +89,8 @@ export default function ReviewPage() {
           {claim.conditions && <p className="small">적용 조건: {claim.conditions}</p>}
           {claim.quote && <blockquote>{claim.quote}</blockquote>}
           {source?.url && <a href={source.url} target="_blank" rel="noreferrer" className="source-link">원문 링크 열기 ↗</a>}
-          {source?.origin === 'external_response' && <div className="field"><label htmlFor={`original-${claim.id}`}>AI가 제시한 인용문입니다. 실제 원문을 열어 본문을 붙여넣어 주세요.</label>
-            <textarea id={`original-${claim.id}`} value={originals[source.id] || ''} onChange={e => setOriginals(old => ({ ...old, [source.id]: e.target.value }))} />
-            <label className="row"><input type="checkbox" checked={publication[source.id] || false} onChange={e => setPublication(old => ({ ...old, [source.id]: e.target.checked }))} />공개 문구의 근거로 사용해도 됩니다</label>
-            <button type="button" className="button secondary" onClick={() => {
-              try { update(attachOriginalText(project, source.id, originals[source.id] || '', publication[source.id] || false)); setError(''); setNotice('원문을 연결했습니다. 이 문장이 실제 주장을 뒷받침하는지 확인해 주세요.'); }
-              catch (cause) { setError(cause instanceof Error ? cause.message : '원문을 확인하지 못했어요.'); }
-            }}>원문 연결하기</button>
-          </div>}
           {source && source.origin !== 'external_response' && <details><summary>저장한 원문 확인</summary><pre className="output">{source.body}</pre></details>}
-          {claim.status !== 'supported' && source && source.origin !== 'external_response' && <p><button type="button" className="button secondary" onClick={() => confirmClaim(claim.id)}>원문과 직접 대조했어요</button></p>}
+          {claim.status !== 'supported' && source && source.origin !== 'external_response' && <details><summary className="small">이 주장의 의미와 모델 조건 검토</summary><button type="button" className="button secondary" onClick={() => confirmClaim(claim.id)}>원문과 의미를 직접 대조했어요</button></details>}
           <div className="row small"><button className="button text" type="button" onClick={() => { update(rejectClaim(project, claim.id, 'insufficient')); setNotice('이 주장은 근거 부족으로 보류합니다.'); }}>근거가 부족해요</button>
             <button className="button text" type="button" onClick={() => { update(rejectClaim(project, claim.id, 'contradicted')); setNotice('상충하는 주장으로 기록했습니다. 작성에 사용하지 않습니다.'); }}>원문과 맞지 않아요</button></div>
         </article>;
@@ -96,11 +103,11 @@ export default function ReviewPage() {
     <details className={styles.fold}><summary>자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>
     {hasAnalysis && <details className={styles.fold} open={!!project.manualResearchRequestId}><summary>조사 보완하기 <span>새 자료나 질문이 있을 때</span></summary><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></details>}
     {hasAnalysis && <section className="card" aria-labelledby="next-step-heading"><span className="eyebrow">다음 단계 · 3. 결과 받기</span><h2 id="next-step-heading">작성 요청문을 만드시겠어요?</h2>
-      <p className="small muted">{usableEvidence
-        ? '원문을 대조한 사실과 수정 의견으로 요청문을 만듭니다. 다음 화면에서 복사해 외부 AI에 보내 주세요.'
-        : `아직 원문을 대조한 공개 가능 주장이 없습니다${unreviewed ? ` · 원문 확인 필요 ${unreviewed}개` : ''}. 제품 사실을 담으려면 원문을 확인해 주세요. 지금 진행하면 미확인 기능·수치가 빠진 자료 보완용 구성안을 요청합니다.`}</p>
-      <div className="row"><button className="button" type="button" disabled={advancing} onClick={usableEvidence ? () => void continueToWriting(false) : openEvidence}>
-        {usableEvidence ? '이 방향으로 작성 요청문 만들기' : '원문 확인하고 작성하기'}</button>
+      <p className="small muted">{usableEvidence ? `확인된 사실을 담아 작성합니다. 추가로 확인할 제품 사실 후보 ${draftCandidates}개는 검토용으로 구분합니다.` :
+        draftCandidates ? `외부 조사에서 가져온 사실 후보 ${draftCandidates}개를 모델·조건과 함께 검토용 원고에 전달합니다. 원문을 대조하기 전까지 최종본으로 사용할 수 없습니다.` :
+          '사용할 사실 후보가 없어 자료 보완용 구성안으로 진행할 수 있습니다.'} 다음 화면에서 요청문을 복사해 외부 AI에 보내 주세요.</p>
+      <div className="row"><button className="button" type="button" disabled={advancing || (!usableEvidence && !draftCandidates)} onClick={() => void continueToWriting(false)}>
+        이 방향으로 작성 요청문 만들기</button>
         <button className="button secondary" type="button" disabled={advancing} onClick={() => void continueToWriting(true)}>자료 보완용 구성안 요청문 만들기</button></div>
       {insightError && <p className="alert" role="alert">{insightError}</p>}
       {advancing && <p role="status" className="small muted">작성 요청문을 저장하고 있습니다…</p>}

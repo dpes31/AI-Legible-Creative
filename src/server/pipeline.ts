@@ -36,7 +36,7 @@ export async function executeStage(provider: ProviderAdapter, stage: Stage, proj
   const channel = stage.slice('channel:'.length);
   if (!project.selectedChannels.includes(channel as Project['selectedChannels'][number])) throw new ApiFailure(422, '선택하지 않은 문서입니다.');
   const brief = buildContentBrief(project, requestId, [channel as Project['selectedChannels'][number]]);
-  return provider.generateStructured(`채널 ${channel} 한 개를 한국어로 작성하세요. 다음 alc.brief.v1은 검수된 작성 방향과 자료의 공통 계약입니다. feedback은 방향 제안이며 allowedClaims 밖의 사실을 보태는 허가가 아닙니다. 질문에 실제로 답하고 확인된 원문·모델·조건을 공개 본문에 포함하세요. 비교 미확인, 없는 후기·인용·수치·우위를 만들어 내지 마세요. 근거가 부족하면 구성안임을 밝히고 빈약한 안내문을 완성본으로 꾸미지 마세요. 반환 형식은 alc.content.v1의 documents 배열이며 requestId는 ${requestId}입니다.\n${JSON.stringify(brief)}`, 'content');
+  return provider.generateStructured(`채널 ${channel} 한 개를 한국어로 작성하세요. alc.brief.v1의 answerPlans와 채널 directions에 따라 질문에 직접 답하고 모델·조건·한계를 포함하세요. allowedClaims는 확인 사실이고 draftClaims는 외부 조사에 따른 미검증 후보입니다. 후보를 사용하는 문단은 “조사 응답 기반 · 원문/의미 확인 전”으로 밝히고 claimRefs를 연결하세요. 최종본이라고 주장하지 마세요. feedback은 작성 방향이며 근거 밖의 새 효능·수치·비교 우위를 보태는 허가가 아닙니다. 확인되지 않은 비교와 가짜 후기·인용·타임스탬프는 만들지 마세요. 빈약한 안내문을 완성본으로 꾸미지 마세요. 반환 형식은 alc.content.v1의 documents 배열이며 requestId는 ${requestId}입니다.\n${JSON.stringify(brief)}`, 'content');
 }
 
 export function executionConfig(env: Record<string, string | undefined> = process.env) {

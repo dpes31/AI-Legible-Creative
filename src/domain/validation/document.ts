@@ -1,7 +1,7 @@
 import type { ChannelDocument, Project } from '../schema';
 import { fingerprint, normalize } from '../text';
 
-export const validationRulesVersion = 'alc.validation.4';
+export const validationRulesVersion = 'alc.validation.5';
 const elevated = /(?:\d[\d,.]*\s*(?:%|퍼센트|원|만원|시간|분|년|개월|배|건|위|kg|g|ml|l|㎏|㎖|그램|리터|킬로그램|mm|cm|m|㎜|㎝|°|도)|1\s*위|유일|최고|인증|효능|치료|완치|특허|입증|더\s*(?:뛰어|좋|우수)|보장|누수\s*없|효과가\s*있)/i;
 const experience = /(?:써\s*보니|사용해\s*보니|사용한\s*후|제가\s*직접|저는\s*직접|만족했|만족스러웠|체감했|효과를\s*봤)/;
 const factual = /(?:가능합니다|입니다[.!]?$|갖추고|제공합니다|지원합니다|유지합니다|줄여\s*줍니다|개선합니다|만들었습니다|탑재|함유|없습니다)/;
@@ -93,7 +93,13 @@ export function validateDocument(project: Project, document: ChannelDocument): C
     const refs = block.claimRefs.map(id => project.claims.find(c => c.id === id));
     for (const claim of refs) {
       const source = project.sources.find(s => s.id === claim?.sourceId);
-      if (!claim || claim.status !== 'supported' || claim.target === 'unresolved') add(block.id, '확인되지 않은 주장이 문구에 연결되어 있습니다.');
+      if (claim?.status === 'unreviewed' && claim.target === 'own' && source?.externalAiAllowed && source.excerpt) {
+        add(block.id, '외부 조사에서 가져온 제품 사실입니다. 원문과 의미를 확인하기 전까지 검토용 초안입니다.', 'review');
+        if (!/조사 응답 기반|원문.{0,5}확인 전|미확인.{0,5}초안/.test(block.text))
+          add(block.id, '미확인 사실을 사용한 문단에 검토용 표기를 넣어 주세요.');
+        if (claim.conditions && !normalize(block.text).includes(normalize(claim.conditions)))
+          add(block.id, `적용 조건이 문구에서 빠졌습니다: ${claim.conditions}`);
+      } else if (!claim || claim.status !== 'supported' || claim.target === 'unresolved') add(block.id, '확인되지 않은 주장이 문구에 연결되어 있습니다.');
       else if (!source?.publicationAllowed || source.origin === 'external_response' || !claim.quote || !normalize(source.body).includes(normalize(claim.quote))) {
         add(block.id, '공개 사용이나 원문 대조가 확인되지 않은 근거가 있습니다.');
       } else if (claim.review && claim.review.sourceHash !== source.hash) add(block.id, '원문이 바뀌어 주장을 다시 확인해야 합니다.');
@@ -126,7 +132,8 @@ export function validateDocument(project: Project, document: ChannelDocument): C
   const completeness = channelCompleteness(project, document);
   warnings.push(...completeness.missing);
   const status = issues.some(i => i.severity === 'block') ? 'blocked' :
-    !project.claims.some(c => c.status === 'supported') || project.insight.approval === 'outline' ? 'outline' : 'needs_review';
+    project.insight.approval === 'outline' || (!project.claims.some(c => c.status === 'supported') &&
+      !document.blocks.some(b => b.claimRefs.some(ref => project.claims.some(c => c.id === ref && c.status === 'unreviewed')))) ? 'outline' : 'needs_review';
   return { ...document, status, warnings: [...new Set(warnings)], validationHash: null,
     validation: { hash: fingerprint(JSON.stringify(document.blocks) + project.evidenceRevision), rulesVersion: validationRulesVersion,
       checkedAt: new Date().toISOString(), semanticMethod: 'not_run', issues } };

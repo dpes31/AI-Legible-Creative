@@ -47,7 +47,7 @@ function ResultsWorkspace() {
     {notice && <p className="small muted" role="status">{notice}</p>}
     {project.migrationNote && <details className="notice-details"><summary>가져온 응답에서 확인할 사항</summary><p className="small muted">{project.migrationNote}</p></details>}
     {!hasDocuments && <section className="card"><span className="eyebrow">두 번째 요청 · 작성</span><h2>확인한 근거로 채널별 문구를 만듭니다.</h2>
-      {!project.claims.some(c => c.status === 'supported') && <p className="small muted">확인된 사실이 아직 없습니다. 기능·수치 없는 자료 보완용 구성안을 받을 수 있습니다.</p>}
+      {!project.claims.some(c => c.status === 'supported') && <p className="small muted">확인된 사실이 아직 없습니다. 외부 조사에서 가져온 제품 사실 후보는 검토용 원고에 구분해 담을 수 있으며, 원문·의미를 확인하기 전에는 최종본이 아닙니다.</p>}
       {insightCurrent(project) ? <ManualExchange project={project} stage="content" update={update} onError={setError} onNotice={setNotice} />
         : <p>핵심 인사이트에서 질문과 작성 방향을 먼저 확인해 주세요. <Link href="/review">인사이트 검수하기</Link></p>}
     </section>}

@@ -60,6 +60,15 @@ export const recommendationSchema = z.object({
   comparisonIds: z.array(id), limitation: z.string().max(3000),
 });
 export type Recommendation = z.infer<typeof recommendationSchema>;
+export const answerPlanSchema = z.object({
+  id, questionId: id, directAnswer: z.string().max(5000), applicableModel: z.string().max(300),
+  alternatives: z.array(z.string().max(300)), selectionReason: z.string().max(3000),
+  limitations: z.string().max(3000), contentGap: z.string().max(3000),
+  claimIds: z.array(id), comparisonIds: z.array(id),
+  channels: z.array(z.object({ channel: z.enum(channels), angle: z.string().max(1000), depth: z.string().max(2000) })),
+  reviewStatus: z.enum(['needs_analysis', 'proposed', 'reviewed']),
+});
+export type AnswerPlan = z.infer<typeof answerPlanSchema>;
 export const blockSchema = z.object({
   id, kind: z.enum(['heading', 'paragraph', 'bullet', 'cta', 'note']),
   text: z.string().max(25000), claimRefs: z.array(id), questionRefs: z.array(id).optional(), section: z.string().optional(),
@@ -95,8 +104,10 @@ export const projectSchema = z.object({
   revision: z.number().int().nonnegative(),
   sources: z.array(sourceSchema), claims: z.array(claimSchema), questions: z.array(questionSchema),
   comparisons: z.array(comparisonSchema), recommendations: z.array(recommendationSchema),
+  answerPlans: z.array(answerPlanSchema).default([]),
   analysisHistory: z.array(z.object({ inputRevision: z.number().int(), evidenceRevision: z.number().int(), at: z.string().datetime(),
     questions: z.array(questionSchema), comparisons: z.array(comparisonSchema), recommendations: z.array(recommendationSchema),
+    answerPlans: z.array(answerPlanSchema).optional(),
     researchInsights: z.unknown().optional(),
   })).default([]),
   insight: z.object({ revision: z.number().int().nonnegative(), feedback: z.string().max(10000),
@@ -157,6 +168,8 @@ export function assertProjectRelations(project: Project): void {
       project.comparisons.some(item => [...item.ownClaimIds, ...item.otherClaimIds].some(id => !claimIds.has(id))) ||
       project.recommendations.some(item => item.claimIds.some(id => !claimIds.has(id)) ||
         item.comparisonIds.some(id => !comparisonIds.has(id))) ||
+      project.answerPlans.some(item => !questionIds.has(item.questionId) ||
+        item.claimIds.some(id => !claimIds.has(id)) || item.comparisonIds.some(id => !comparisonIds.has(id))) ||
       project.researchInsights.questionClusters.some(item => item.questionIds.some(id => !questionIds.has(id))) ||
       project.researchInsights.unmetNeeds.some(item => item.sourceIds.some(id => !sourceIds.has(id))) ||
       project.questionAnswers.some(item => !historicalQuestionIds.has(item.questionId) || item.claimIds.some(id => !claimIds.has(id))) ||
@@ -211,6 +224,17 @@ export const researchV2Schema = researchImportSchema.extend({
   existingContent: z.array(z.object({ title: z.string(), url: webUrl.nullable(), gap: z.string() })).default([]),
 });
 export type ResearchV2Import = z.infer<typeof researchV2Schema>;
+export const researchV3Schema = researchV2Schema.extend({
+  contract: z.literal('alc.research.v3'),
+  answerPlans: z.array(z.object({
+    questionRef: id, directAnswer: z.string().max(5000).default(''), applicableModel: z.string().max(300).default(''),
+    alternatives: z.array(z.string().max(300)).default([]), selectionReason: z.string().max(3000).default(''),
+    limitations: z.string().max(3000).default(''), contentGap: z.string().max(3000).default(''),
+    claimRefs: z.array(id).default([]), comparisonRefs: z.array(id).default([]),
+    channels: z.array(z.object({ channel: z.enum(channels), angle: z.string().max(1000), depth: z.string().max(2000) })).default([]),
+  })).default([]),
+});
+export type ResearchV3Import = z.infer<typeof researchV3Schema>;
 export const contentImportSchema = z.object({
   contract: z.literal('alc.content.v1'), requestId: id,
   documents: z.array(z.object({
@@ -237,7 +261,7 @@ export function newProject(input: Pick<Project, 'name' | 'kind' | 'description' 
   return projectSchema.parse({
     ...input, schemaVersion: 2, id: crypto.randomUUID(), ownerId: 'local', market: 'KR', language: 'ko',
     inputRevision: 1, evidenceRevision: 0, revision: 0,
-    sources: [], claims: [], questions: [], comparisons: [], recommendations: [], documents: {}, documentHistory: {},
+    sources: [], claims: [], questions: [], comparisons: [], recommendations: [], answerPlans: [], documents: {}, documentHistory: {},
     manualResearchRequestId: null, manualContentRequestId: null,
     previousDraft: null, migrationNote: null, createdAt: now, updatedAt: now,
   });
