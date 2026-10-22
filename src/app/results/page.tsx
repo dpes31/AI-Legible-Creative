@@ -22,10 +22,13 @@ function ResultsWorkspace() {
   const router = useRouter(); const searchParams = useSearchParams();
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [activeBlock, setActiveBlock] = useState(''); const [copyFallback, setCopyFallback] = useState('');
+  const [reviewedRevision, setReviewedRevision] = useState(''); const [feedbackRevision, setFeedbackRevision] = useState('');
   if (loading) return <p role="status">문구를 불러오는 중입니다…</p>;
   if (!project) return <div className="card"><h1>먼저 알릴 대상을 정해 주세요.</h1><Link className="button" href="/">정보 입력하기</Link></div>;
   const current: Channel = project.selectedChannels.find(item => item === searchParams.get('channel')) || project.selectedChannels[0];
   const document = project.documents[current]; const proposal = project.documentProposals[current];
+  const reviewKey = document ? `${document.id}:${document.revision}:${project.evidenceRevision}:${project.insight.revision}` : '';
+  const assignedAnswers = project.answerPlans.filter(plan => plan.channels.some(direction => direction.channel === current));
   const hasDocuments = Object.keys(project.documents).length > 0;
   const selected = document?.blocks.find(b => b.id === activeBlock) || document?.blocks.find(b => b.kind !== 'note');
   const refs = selected?.claimRefs || [];
@@ -88,7 +91,21 @@ function ResultsWorkspace() {
       {document && <>
         <div className="row"><button className="button text" type="button" onClick={() => act(() => update(editDocument(project, current, [...document.blocks, { id: crypto.randomUUID(), kind: 'paragraph', text: '', claimRefs: [] }]))) }>+ 문단 더하기</button>
           <button className="button text" type="button" onClick={() => act(() => update(editDocument(project, current, [...document.blocks, { id: crypto.randomUUID(), kind: 'note', text: '', claimRefs: [] }]))) }>+ 작성 메모</button></div>
-        <div className={styles.review}><button className="button secondary" type="button" onClick={() => act(() => update(reviewDocument(project, current)), '이 채널의 현재 본문을 검토한 기록을 남겼습니다.')}>이 채널 원고 검토 완료</button><span className="small muted">미확인 주장과 채널 구성이 남으면 최종본으로 바뀌지 않습니다.</span></div>
+        <div className={styles.review}>
+          {!!assignedAnswers.length && <details><summary>이 문서가 답할 고객 질문 {assignedAnswers.length}개</summary><ul>{assignedAnswers.map(plan => {
+            const question = project.questions.find(item => item.id === plan.questionId);
+            const covered = document.blocks.some(block => block.kind !== 'note' && block.questionRefs?.includes(plan.questionId));
+            return <li key={plan.id}><strong>{question?.text || '고객 질문'}</strong> · {covered ? '본문 연결 있음' : '본문 연결 없음'}<br />
+              답변 방향: {plan.directAnswer || '조사에서 직접 답을 얻지 못함'}{plan.applicableModel && <> · 적용 모델: {plan.applicableModel}</>}
+              {plan.limitations && <> · 한계: {plan.limitations}</>}</li>;
+          })}</ul></details>}
+          <label className="row small"><input type="checkbox" checked={reviewedRevision === reviewKey} onChange={event => setReviewedRevision(event.target.checked ? reviewKey : '')} />이 원고가 고객 질문에 답하고 모델·조건이 원문과 맞는지 확인했습니다.</label>
+          {project.insight.feedback.trim() && <><p className="small">인사이트 수정 의견: {project.insight.feedback}</p><label className="row small"><input type="checkbox" checked={feedbackRevision === reviewKey} onChange={event => setFeedbackRevision(event.target.checked ? reviewKey : '')} />위 수정 의견이 이 원고에 반영됐는지 확인했습니다.</label></>}
+          <button className="button secondary" type="button" onClick={() => act(() => update(reviewDocument(project, current, {
+            meaningReviewed: reviewedRevision === reviewKey, feedbackReviewed: feedbackRevision === reviewKey,
+          })), '이 채널의 현재 본문을 검토한 기록을 남겼습니다.')}>이 채널 원고 검토 완료</button>
+          <span className="small muted">자동 검사에서 사실·질문·모델 조건이 빠지면 최종본으로 바뀌지 않습니다. 의미는 직접 대조해야 합니다.</span>
+        </div>
         {!!project.documentHistory[current]?.length && <details><summary>이전 버전 {project.documentHistory[current]?.length}개 보기</summary>{project.documentHistory[current]?.slice(-10).reverse().map(old => <div className="document-block" key={`${old.id}-${old.revision}`}><strong className="small">버전 {old.revision}</strong><pre className="output">{serializeDocument(old)}</pre><button className="button secondary" type="button" onClick={() => act(() => update(restoreDocumentVersion(project, current, old.id, old.revision)), '이전 본문을 가져왔습니다. 현재 근거로 다시 확인해 주세요.')}>이 본문 다시 사용하기</button></div>)}</details>}
       </>}
       {project.previousDraft && <details><summary>예전 앱에서 가져온 초안 보기</summary><pre className="output">{project.previousDraft}</pre></details>}

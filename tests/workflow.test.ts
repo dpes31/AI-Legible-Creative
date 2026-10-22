@@ -119,7 +119,8 @@ describe('사실과 프로젝트의 무결성', () => {
       { id: 'body3', kind: 'paragraph', text: '언제 쓸지 떠올린 뒤 고르세요.', claimRefs: [] },
       { id: 'cta3', kind: 'cta', text: '종류 살펴보기', claimRefs: [] },
     ]);
-    expect(reviewDocument(complete, 'ad_copy').documents.ad_copy?.status).toBe('ready');
+    expect(() => reviewDocument(complete, 'ad_copy')).toThrow('의미를 원문과 대조');
+    expect(reviewDocument(complete, 'ad_copy', { meaningReviewed: true, feedbackReviewed: false }).documents.ad_copy?.status).toBe('ready');
     const edited = editDocument(complete, 'ad_copy', complete.documents.ad_copy!.blocks.map(block =>
       block.id === 'fact' ? { ...block, text: '뚜껑을 2배 빠르게 닫습니다.' } : block));
     expect(edited.documents.ad_copy?.status).toBe('stale');

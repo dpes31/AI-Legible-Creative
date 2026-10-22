@@ -59,6 +59,24 @@ test('질문별 분석과 같은 출처의 발췌를 한 번에 살펴보고 검
   expect(writing).toContain('일반형 A를 먼저 설명해 주세요.');
   expect(writing).toContain('unverified_candidate');
   expect(writing).toContain('가상 트리플체어 일반형 A');
+  const contentId = writing.match(/requestId: ([\w-]+)/)?.[1];
+  const inputRevision = Number(writing.match(/입력 버전: (\d+)/)?.[1]);
+  const evidenceRevision = Number(writing.match(/근거 버전: (\d+)/)?.[1]);
+  const insightRevision = Number(writing.match(/"insightRevision": (\d+)/)?.[1]);
+  const unsafe = { contract: 'alc.content.v2', requestId: contentId, inputRevision, evidenceRevision, insightRevision,
+    documents: [{ channel: 'product_page', blocks: [
+      { kind: 'heading', text: '모델별 선택', claimRefs: [] },
+      { kind: 'paragraph', text: '모든 고객의 허리 통증이 사라집니다.', claimRefs: [] },
+      { kind: 'heading', text: '자주 묻는 질문', claimRefs: [] },
+      { kind: 'paragraph', text: '등 안마는 어느 모델인가요? 구매 전 옵션을 확인해 주세요.', claimRefs: [] },
+    ] }], unresolvedItems: [] };
+  await page.getByLabel('AI에서 받은 작성 결과 붙여넣기').fill(JSON.stringify(unsafe));
+  await page.getByRole('button', { name: '채널별 문구 가져오기' }).click();
+  await page.getByLabel('보고 싶은 결과물').selectOption('product_page');
+  await expect(page.getByTestId('publication-status')).toHaveText('근거 보완 필요');
+  await page.getByRole('button', { name: '이 채널 원고 검토 완료' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: '확인되지 않은 사실' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '최종본 복사' })).toHaveCount(0);
 });
 
 test('API 없이 두 번의 응답으로 여섯 문서를 분리하고 다시 연다', async ({ page }, testInfo) => {

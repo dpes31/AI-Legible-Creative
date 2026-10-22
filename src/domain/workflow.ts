@@ -511,7 +511,7 @@ export function restoreDocumentVersion(project: Project, channel: typeof channel
     documentHistory: { ...project.documentHistory, [channel]: [...(project.documentHistory[channel] || []), current] } };
 }
 
-export function reviewDocument(project: Project, channel: typeof channels[number]): Project {
+export function reviewDocument(project: Project, channel: typeof channels[number], confirmation?: { meaningReviewed: boolean; feedbackReviewed: boolean }): Project {
   const document = project.documents[channel];
   if (!document || document.evidenceRevision !== project.evidenceRevision) throw new ImportError('근거가 바뀌었습니다. 이 채널을 다시 작성하거나 확인해 주세요.');
   if (!insightCurrent(project) || document.insightRevision !== project.insight.revision) throw new ImportError('현재 인사이트와 다른 문구입니다. 새 방향으로 다시 작성해 주세요.');
@@ -522,6 +522,15 @@ export function reviewDocument(project: Project, channel: typeof channels[number
     throw new ImportError('검토용 후보 주장이 남아 있습니다. 원문과 의미를 확인하거나 해당 문장을 제외해 주세요.');
   const quality = channelCompleteness(project, checked);
   if (!quality.complete) throw new ImportError(quality.missing[0]);
+  const publicText = checked.blocks.filter(block => block.kind !== 'note').map(block => normalize(block.text)).join('');
+  if (publicText && Object.entries(project.documents).some(([otherChannel, other]) => otherChannel !== channel && other &&
+    other.blocks.filter(block => block.kind !== 'note').map(block => normalize(block.text)).join('') === publicText))
+    throw new ImportError('다른 채널과 같은 본문입니다. 이 채널이 맡은 고객 질문과 구성을 반영해 주세요.');
+  if (checked.validation?.issues.some(issue => issue.severity === 'review'))
+    throw new ImportError('사실인지 확인할 문장이 남아 있습니다. 해당 문장에 근거를 연결하거나 표현을 수정해 주세요.');
+  if (!confirmation?.meaningReviewed) throw new ImportError('고객 질문에 대한 답과 모델·조건의 의미를 원문과 대조한 뒤 확인해 주세요.');
+  if (project.insight.feedback.trim() && !confirmation.feedbackReviewed)
+    throw new ImportError('인사이트에서 남긴 수정 의견이 이 원고에 반영됐는지 확인해 주세요.');
   if ((channel === 'review_video' && !project.sources.some(s => s.sourceType === 'review')) ||
       (channel === 'press_release' && !project.sources.some(s => /발표|출시/.test(s.title)))) {
     throw new ImportError('실제 후기 또는 발표 정보를 확인할 때까지 검토용 초안으로만 사용할 수 있습니다.');
