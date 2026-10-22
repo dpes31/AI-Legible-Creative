@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { newProject, type ChannelDocument, type Project } from '../src/domain/schema';
 import { EntityMismatch, applyDocumentProposal, importContent, importResearch, prepareContent, prepareResearch, updateDocumentText, validateDocument, verifyClaim } from '../src/domain/workflow';
 import { quantities } from '../src/domain/validation/document';
@@ -123,4 +125,35 @@ it('실제 수동 응답처럼 제품명에 별칭이 빠지고 우위 표기가
   expect(imported.migrationNote).toContain('같은 대상으로 확인한 조사 이름');
   expect(imported.missingEvidence.join(' ')).toContain('인용문이 일치하지 않음: C2');
   expect(imported.manualDrafts.research).toBe(started.manualDrafts.research);
+});
+
+it('제조사 발표만 있는 v2 비교를 자료와 함께 가져오되 경쟁 우위로 승인하지 않는다', () => {
+  const started = prepareResearch(base()).project;
+  const fixture = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/manual/research.manufacturer-claim-only.json'), 'utf8'));
+  fixture.requestId = started.manualResearchRequestId;
+  const raw = JSON.stringify(fixture);
+  const imported = importResearch(started, raw);
+  expect(imported.sources).toHaveLength(2);
+  expect(imported.claims).toHaveLength(2);
+  expect(imported.questions).toHaveLength(1);
+  expect(imported.researchInsights.questionClusters[0].questionIds).toEqual([imported.questions[0].id]);
+  expect(imported.researchInsights.unmetNeeds[0].sourceIds).toEqual([imported.sources[0].id]);
+  expect(imported.comparisons).toHaveLength(1);
+  expect(imported.comparisons[0]).toMatchObject({ comparable: false, verdict: 'unknown' });
+  expect(imported.comparisons[0].reason).toContain('제조사 발표만');
+  expect(imported.recommendations[0].claimIds).toEqual([imported.claims[0].id]);
+  expect(imported.recommendations[0].comparisonIds).toEqual([imported.comparisons[0].id]);
+  expect(imported.claims.every(c => c.status === 'unreviewed')).toBe(true);
+  expect(imported.sources.every(s => s.origin === 'external_response' && !s.publicationAllowed)).toBe(true);
+  expect(imported.missingEvidence.join(' ')).toContain('인용문이 일치하지 않음: C2');
+  expect(importResearch(imported, raw)).toBe(imported);
+});
+
+it('정의되지 않은 비교 판단은 한국어 안내와 함께 거절하고 원본을 보존한다', () => {
+  const started = prepareResearch(base()).project;
+  const fixture = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/manual/research.manufacturer-claim-only.json'), 'utf8'));
+  fixture.requestId = started.manualResearchRequestId;
+  fixture.comparisons[0].verdict = 'unrecognized_label';
+  expect(() => importResearch(started, JSON.stringify(fixture))).toThrow('경쟁 비교 1번의 판단 표기를 읽지 못했어요');
+  expect(started.sources).toHaveLength(0);
 });

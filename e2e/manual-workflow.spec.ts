@@ -187,3 +187,25 @@ test('실제 제품 응답의 이름 차이와 우위 표기를 버튼 옆에서
   await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(2);
   await page.screenshot({ path: testInfo.outputPath('actual-response-alias-mobile.png'), fullPage: true });
 });
+
+test('제조사 발표만 있는 v2 비교도 나머지 조사 내용을 잃지 않고 가져온다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByLabel('무엇을 알리고 싶으신가요?').fill('허구 검수컵');
+  await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
+  await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
+  const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
+  const requestId = prompt.match(/요청 ID: ([\w-]+)/)?.[1];
+  expect(requestId).toBeTruthy();
+  const research = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/manual/research.manufacturer-claim-only.json'), 'utf8'));
+  research.requestId = requestId;
+  await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
+  await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
+  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="analysis-summary"]').getByText('인용문이 일치하지 않음: C2', { exact: false })).toBeVisible();
+  await page.getByText('고객 질문과 경쟁 비교', { exact: false }).click();
+  await expect(page.getByText('기존 제품보다 얼마나 더 담을 수 있나요?')).toBeVisible();
+  await expect(page.locator('.document-block > .badge.warn').filter({ hasText: '비교 미확인' })).toHaveCount(1);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
+});

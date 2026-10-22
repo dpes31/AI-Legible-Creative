@@ -103,7 +103,13 @@ function uniqueRefs(items: { ref: string }[]) {
 export function importResearch(project: Project, response: string, confirmSameEntity = false): Project {
   const raw = parseResponse(response);
   const parsed = (raw && typeof raw === 'object' && 'contract' in raw && raw.contract === 'alc.research.v2' ? researchV2Schema : researchImportSchema).safeParse(raw);
-  if (!parsed.success) throw new ImportError(`조사 응답에서 필요한 항목을 찾지 못했어요: ${parsed.error.issues[0]?.path.join('.') || '형식'}`);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    if (issue?.path.at(-1) === 'verdict') {
+      throw new ImportError(`경쟁 비교 ${Number(issue.path[1]) + 1}번의 판단 표기를 읽지 못했어요. 조사 요청문에 맞춰 다시 받아 주세요.`);
+    }
+    throw new ImportError(`조사 응답에서 필요한 항목을 찾지 못했어요: ${issue?.path.join('.') || '형식'}`);
+  }
   const data: ResearchImport | ResearchV2Import = parsed.data;
   const priorReceipt = project.importReceipts.find(r => r.requestId === data.requestId && r.contract === data.contract);
   if (priorReceipt?.responseHash === fingerprint(response)) return project;
