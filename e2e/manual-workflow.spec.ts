@@ -180,9 +180,12 @@ test('실제 제품 응답의 이름 차이와 우위 표기를 버튼 옆에서
   await expect(page.getByLabel('AI에서 받은 조사 결과 붙여넣기')).toHaveValue(response);
   await page.getByRole('button', { name: '같은 제품임을 확인하고 가져오기' }).click();
   await expect(page.getByRole('heading', { name: '이번 문구의 방향' })).toBeVisible();
-  await expect(page.getByText('원문 확인이 필요한 주장이 2개 있습니다.', { exact: false })).toBeVisible();
+  const nextStep = page.locator('section[aria-labelledby="next-step-heading"]');
+  await expect(nextStep).toContainText('원문 확인 필요 2개');
+  await expect(page.getByText('위에서 인사이트 방향을 확인하면 작성 요청문을 만들 수 있습니다.')).toHaveCount(0);
+  await expect(nextStep.getByRole('button', { name: '원문 확인하고 작성하기' })).toBeVisible();
   await expect(page.getByRole('button', { name: '이 방향으로 작성', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '원문 확인하고 작성하기' }).click();
+  await nextStep.getByRole('button', { name: '원문 확인하고 작성하기' }).click();
   await expect(page.locator('#evidence')).toHaveAttribute('open', '');
   await expect(page.locator('#evidence')).toBeFocused();
   await expect(page).toHaveURL(/\/review$/);

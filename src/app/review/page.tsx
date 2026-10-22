@@ -61,19 +61,9 @@ export default function ReviewPage() {
           onChange={event => { setInsightError(''); update(reviseInsight(project, event.target.value)); }} placeholder="예: 허리 지지보다 공간 활용을 먼저 설명해 주세요. 등·허리 안마는 일반형에만 해당한다고 밝혀 주세요." /></div>
         {/(?:\d\s*(?:%|mm|cm|원|배)|인증|유일|최고|더\s*좋)/.test(project.insight.feedback) &&
           <p className="small muted">새로운 수치·효능·우위가 의견에 있다면 근거 후보로만 보관합니다. 확인한 주장에 없는 내용은 요청문에서 사실로 쓰지 않습니다.</p>}
-        <p className="small muted">{usableEvidence
-          ? '이 방향으로 작성 요청문을 만들면 다음 화면에 바로 표시됩니다. 외부 AI에 보내고 받은 응답을 붙여넣어 주세요.'
-          : `공개 문구에 쓸 수 있도록 원문을 대조한 사실이 아직 없습니다${unreviewed ? ` (${unreviewed}개 확인 필요)` : ''}. 제품 기능·수치를 쓰려면 아래에서 원문을 확인해 주세요. 지금 진행하면 기능·수치 없는 자료 보완용 구성안을 요청합니다.`}</p>
-        <div className="row"><button className="button" type="button" disabled={advancing} onClick={usableEvidence ? () => void continueToWriting(false) : openEvidence}>
-          {usableEvidence ? '이 방향으로 작성 요청문 만들기' : '원문 확인하고 작성하기'}</button>
-        <button className="button secondary" type="button" disabled={advancing} onClick={() => void continueToWriting(true)}>자료 보완용 구성안 요청문 만들기</button></div>
-        {insightError && <p className="alert" role="alert" tabIndex={-1}>{insightError}</p>}
-        {advancing && <p role="status" className="small muted">작성 요청문을 저장하고 있습니다…</p>}
+        <p className="small muted">수정 의견은 자동으로 저장됩니다. 아래 자료와 질문을 살펴본 뒤 페이지 맨 아래에서 작성 방식을 선택해 주세요.</p>
         {insightCurrent(project) && <p role="status" className="small">승인한 방향 {project.insight.revision} · 입력 {project.insight.inputRevision} · 근거 {project.insight.evidenceRevision} 버전</p>}
       </section>
-      <div className={styles.next}><p>{unreviewed ? `원문 확인이 필요한 주장이 ${unreviewed}개 있습니다. 미확인 사실은 제외하고 작성합니다.` : '확인한 사실을 채널에 맞게 다듬을 수 있습니다.'}</p>
-        {insightCurrent(project) ? <Link href="/results" className="button">작성 요청문으로 가기 <span aria-hidden="true">→</span></Link>
-          : <p className="small">위에서 인사이트 방향을 확인하면 작성 요청문을 만들 수 있습니다.</p>}</div>
     </> : <section className="card"><span className="eyebrow">첫 번째 요청 · 조사</span><h2>어떤 점을 알리면 좋을지 찾아봅니다.</h2><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></section>}
     <details className={styles.fold} id="evidence" tabIndex={-1}><summary>근거 확인하기 <span>주장 {project.claims.length}개 · 원문 확인 필요 {unreviewed}개</span></summary>
       {!project.claims.length && <p className="muted">조사 응답을 가져오면 문장별 출처와 조건을 함께 볼 수 있습니다.</p>}
@@ -105,6 +95,17 @@ export default function ReviewPage() {
     </details>
     <details className={styles.fold}><summary>자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>
     {hasAnalysis && <details className={styles.fold} open={!!project.manualResearchRequestId}><summary>조사 보완하기 <span>새 자료나 질문이 있을 때</span></summary><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></details>}
+    {hasAnalysis && <section className="card" aria-labelledby="next-step-heading"><span className="eyebrow">다음 단계 · 3. 결과 받기</span><h2 id="next-step-heading">작성 요청문을 만드시겠어요?</h2>
+      <p className="small muted">{usableEvidence
+        ? '원문을 대조한 사실과 수정 의견으로 요청문을 만듭니다. 다음 화면에서 복사해 외부 AI에 보내 주세요.'
+        : `아직 원문을 대조한 공개 가능 주장이 없습니다${unreviewed ? ` · 원문 확인 필요 ${unreviewed}개` : ''}. 제품 사실을 담으려면 원문을 확인해 주세요. 지금 진행하면 미확인 기능·수치가 빠진 자료 보완용 구성안을 요청합니다.`}</p>
+      <div className="row"><button className="button" type="button" disabled={advancing} onClick={usableEvidence ? () => void continueToWriting(false) : openEvidence}>
+        {usableEvidence ? '이 방향으로 작성 요청문 만들기' : '원문 확인하고 작성하기'}</button>
+        <button className="button secondary" type="button" disabled={advancing} onClick={() => void continueToWriting(true)}>자료 보완용 구성안 요청문 만들기</button></div>
+      {insightError && <p className="alert" role="alert">{insightError}</p>}
+      {advancing && <p role="status" className="small muted">작성 요청문을 저장하고 있습니다…</p>}
+      {insightCurrent(project) && <p className="small"><Link href="/results">이미 만든 작성 요청문 보기 →</Link></p>}
+    </section>}
     {!hasAnalysis && <div className={styles.next}><p>자료가 부족하면 기능·수치 없는 구성안부터 만들 수 있습니다.</p>
       <button type="button" className="button secondary" disabled={advancing} onClick={() => void continueToWriting(true)}>자료 보완용 구성안 요청문 만들기</button>
       {insightError && <p className="alert" role="alert">{insightError}</p>}
