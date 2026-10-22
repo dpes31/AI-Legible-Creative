@@ -132,7 +132,12 @@ test('두 창에서 겹친 수정도 새로고침 뒤 초안으로 남는다', a
   }
   await page.getByLabel('한 줄 설명 또는 강조하고 싶은 특징').fill('첫 창에서 저장한 설명');
   await page.getByRole('button', { name: '바뀐 입력 저장하기' }).click();
-  await expect(page.getByText('이 브라우저에 저장됨', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '브랜드 분석: 충돌 검수용 가상 브랜드' })).toBeVisible();
+  await page.reload();
+  await page.goto('/');
+  await page.getByRole('button', { name: '입력 고치기' }).click();
+  await page.getByText('자료 더하기 · 결과물 선택', { exact: false }).click();
+  await expect(page.getByLabel('한 줄 설명 또는 강조하고 싶은 특징')).toHaveValue('첫 창에서 저장한 설명');
   await other.getByLabel('한 줄 설명 또는 강조하고 싶은 특징').fill('두 번째 창에서 보관할 설명');
   await other.getByRole('button', { name: '바뀐 입력 저장하기' }).click();
   await expect(other.getByText(/이 창의 초안도 별도 보관/)).toBeVisible();

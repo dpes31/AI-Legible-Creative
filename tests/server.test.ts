@@ -4,6 +4,7 @@ import { MockProvider, inspectResponse, ProviderFailure, type ProviderAdapter } 
 import { executionConfig, executeStage, inputHash, nextStage } from '../src/server/pipeline';
 import { capabilities } from '../src/server/capabilities';
 import { serverProject } from '../src/server/project-store';
+import { approveInsight } from '../src/domain/insight';
 
 function sample() { return newProject({ name: '허구의 햇살 보온병', kind: 'product', description: '시험 자료', officialUrl: '', objective: 'feature', audience: '', audienceUndecided: true, selectedChannels: ['ad_copy', 'blog'], mode: 'manual' }); }
 const result = { requestId: 'mock-1', text: '공식 자료를 찾지 못했습니다.', inputTokens: 10, outputTokens: 8, citations: [] };
@@ -39,7 +40,7 @@ describe('유료 실행의 경계', () => {
     let sent = '';
     const provider: ProviderAdapter = { research: async () => result,
       generateStructured: async prompt => { sent = prompt; return result; }, validateClaims: async () => result };
-    await executeStage(provider, 'channel:ad_copy', p, 'run');
+    await executeStage(provider, 'channel:ad_copy', approveInsight(p, true), 'run');
     expect(sent).not.toContain('기밀 특징');
   });
   it('거절·중단·빈 응답을 성공으로 포장하지 않는다', () => {

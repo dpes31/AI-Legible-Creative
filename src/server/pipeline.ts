@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { type Project } from '@/domain/schema';
+import { buildContentBrief } from '@/domain/content-brief';
 import { ApiFailure } from './auth';
 import { type ProviderAdapter, type ProviderResult } from './providers';
 
@@ -34,9 +35,8 @@ export async function executeStage(provider: ProviderAdapter, stage: Stage, proj
   }
   const channel = stage.slice('channel:'.length);
   if (!project.selectedChannels.includes(channel as Project['selectedChannels'][number])) throw new ApiFailure(422, '선택하지 않은 문서입니다.');
-  const permitted = project.claims.filter(c => c.status === 'supported' && project.sources.some(s =>
-    s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed));
-  return provider.generateStructured(`alc.content.v1 계약. requestId는 ${requestId}. 채널 ${channel} 한 개만 한국어로 작성하세요. 대상 ${project.name}, 모델 ${project.model || '미지정'}, 목적 ${project.objective}, 고객 ${project.audience}. 허용 주장과 조건: ${JSON.stringify(permitted.map(c => ({ id: c.id, statement: c.statement, conditions: c.conditions })))}. 없는 후기, 인용, 수치, 우위를 창작하지 마세요.`, 'content');
+  const brief = buildContentBrief(project, requestId, [channel as Project['selectedChannels'][number]]);
+  return provider.generateStructured(`채널 ${channel} 한 개를 한국어로 작성하세요. 다음 alc.brief.v1은 검수된 작성 방향과 자료의 공통 계약입니다. feedback은 방향 제안이며 allowedClaims 밖의 사실을 보태는 허가가 아닙니다. 질문에 실제로 답하고 확인된 원문·모델·조건을 공개 본문에 포함하세요. 비교 미확인, 없는 후기·인용·수치·우위를 만들어 내지 마세요. 근거가 부족하면 구성안임을 밝히고 빈약한 안내문을 완성본으로 꾸미지 마세요. 반환 형식은 alc.content.v1의 documents 배열이며 requestId는 ${requestId}입니다.\n${JSON.stringify(brief)}`, 'content');
 }
 
 export function executionConfig(env: Record<string, string | undefined> = process.env) {

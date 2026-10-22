@@ -1,6 +1,6 @@
 import { type Project } from '@/domain/schema';
 import { importContent, importResearch } from '@/domain/workflow';
-import { approveInsight } from '@/domain/insight';
+import { approveInsight, insightCurrent } from '@/domain/insight';
 import { executeStage, inputHash, plannedStages, type Stage } from './pipeline';
 import { type ProviderAdapter, type ProviderResult } from './providers';
 
@@ -21,6 +21,11 @@ export async function advanceMockRun(run: MockRun, provider: ProviderAdapter): P
   const index = run.steps.findIndex(step => step.status === 'pending');
   if (index < 0) return run;
   const step = run.steps[index];
+  if (step.stage.startsWith('channel:') && !insightCurrent(run.project)) {
+    return { ...run, steps: run.steps.map((item, i) => i === index ? {
+      ...item, status: 'failed', error: '현재 분석의 핵심 인사이트를 먼저 확인해 주세요.',
+    } : item) };
+  }
   const previous = run.steps.find(item => item.stage === 'research')?.result;
   let result: ProviderResult;
   const stageRequestId = step.stage.startsWith('channel:') ? `${run.requestId}:${step.stage.slice(8)}` : run.requestId;
