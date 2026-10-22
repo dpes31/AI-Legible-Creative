@@ -48,7 +48,7 @@ test('질문별 분석과 같은 출처의 발췌를 한 번에 살펴보고 검
   };
   await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
   await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
-  await expect(page.getByText('일반형 A의 등 안마는 확인 후보입니다.')).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="analysis-summary"] p').filter({ hasText: '일반형 A의 등 안마는 확인 후보입니다.' })).toBeVisible();
   await page.getByText('자료와 근거 살펴보기', { exact: false }).click();
   await expect(page.getByRole('textbox', { name: '이 출처의 실제 본문 또는 관련 원문 구간' })).toHaveCount(1);
   await page.getByLabel('수정할 방향').fill('일반형 A를 먼저 설명해 주세요.');
