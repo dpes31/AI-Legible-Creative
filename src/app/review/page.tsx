@@ -8,6 +8,8 @@ import { attachOriginalText, prepareContent, rejectClaim, verifyClaim } from '@/
 import { AnalysisSummary } from '@/features/review/AnalysisSummary';
 import { ComparisonReview } from '@/features/review/ComparisonReview';
 import { SourceForm } from '@/features/review/SourceForm';
+import { ConsumerDataForm } from '@/features/review/ConsumerDataForm';
+import { questionEvidenceLabel } from '@/domain/consumer-data';
 import { ManualExchange } from '@/features/manual/ManualExchange';
 import { approveInsight, hasUsableEvidence, insightCurrent, reviseInsight } from '@/domain/insight';
 import styles from '@/features/review/Review.module.css';
@@ -55,6 +57,10 @@ export default function ReviewPage() {
     {project.migrationNote && <details className="notice-details"><summary>가져온 자료에서 확인할 사항</summary><p className="small muted">{project.migrationNote}</p></details>}
     {error && <p className="alert" role="alert">{error}</p>}
     {notice && <p className="small muted" role="status">{notice}</p>}
+    <section className="card">
+      {hasAnalysis ? <details><summary>소비자·검색 자료 보완</summary><ConsumerDataForm project={project} update={update} /></details>
+        : <ConsumerDataForm project={project} update={update} />}
+    </section>
     {hasAnalysis ? <>
       <AnalysisSummary project={project} />
       <section className="card" aria-labelledby="insight-review-heading"><h2 id="insight-review-heading">핵심 인사이트 검수</h2>
@@ -97,10 +103,11 @@ export default function ReviewPage() {
       })}
     </details>
     <details className={styles.fold}><summary>고객 질문과 경쟁 비교 <span>질문 {project.questions.length}개 · 비교 {project.comparisons.length}개</span></summary>
-      <h3>고객이 궁금해하는 것</h3>{project.questions.length ? <ul className="list">{project.questions.map(q => <li key={q.id}>{q.text} <span className="badge">{q.provenance === 'observed' ? '관찰' : q.provenance === 'reconstructed' ? '자료로 재구성' : '가설'}</span></li>)}</ul> : <p className="small muted">아직 조사한 질문이 없습니다.</p>}
+      <h3>고객이 궁금해하는 것</h3>{project.questions.length ? <ul className="list">{project.questions.map(q => <li key={q.id}>{q.text} <span className={q.observationLinkStatus === 'missing' ? 'badge warn' : 'badge'}>{questionEvidenceLabel(project, q)}</span></li>)}</ul> : <p className="small muted">아직 조사한 질문이 없습니다.</p>}
       <h3>경쟁 제품과 같은 점·다른 점</h3>{project.comparisons.length ? project.comparisons.map(c => <ComparisonReview key={c.id} project={project} comparison={c} update={update} onError={setError} />) : <p className="small muted">비교할 자료가 없습니다. 자사 특징만으로 우위를 판단하지 않습니다.</p>}
     </details>
-    <details className={styles.fold}><summary>자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>
+    {hasAnalysis && <details className={styles.fold}><summary>소비자·검색 자료 더하기 <span>구조화 파일 {project.consumerDatasets.length}개</span></summary><ConsumerDataForm project={project} update={update} /></details>}
+    {hasAnalysis && <details className={styles.fold}><summary>제품 원문 자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>}
     {hasAnalysis && <details className={styles.fold} open={!!project.manualResearchRequestId}><summary>조사 보완하기 <span>새 자료나 질문이 있을 때</span></summary><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></details>}
     {hasAnalysis && <section className="card" aria-labelledby="next-step-heading"><span className="eyebrow">다음 단계 · 3. 결과 받기</span><h2 id="next-step-heading">작성 요청문을 만드시겠어요?</h2>
       <p className="small muted">{usableEvidence ? `확인된 사실을 담아 작성합니다. 추가로 확인할 제품 사실 후보 ${draftCandidates}개는 검토용으로 구분합니다.` :

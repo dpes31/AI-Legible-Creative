@@ -45,8 +45,33 @@ export const questionSchema = z.object({
   id, text: shortText, provenance: z.enum(['observed', 'reconstructed', 'hypothesis']),
   sourceIds: z.array(id), situation: z.string().optional(), need: z.string().optional(), painPoint: z.string().optional(),
   decisionCriteria: z.array(z.string()).optional(), modelIds: z.array(id).optional(),
+  observationIds: z.array(id).optional(),
+  observationLinkStatus: z.enum(['linked', 'missing', 'not_applicable']).optional(),
 });
 export type CustomerQuestion = z.infer<typeof questionSchema>;
+export const consumerDatasetSchema = z.object({
+  schemaVersion: z.literal(1), id, projectId: id, fileName: shortText, format: z.enum(['csv', 'tsv', 'txt', 'xlsx']),
+  fileHash: id, dataType: z.enum(['search_metrics', 'search_query', 'search_relation', 'customer_verbatim', 'survey', 'owned_content', 'other']),
+  provider: z.string().max(300), market: z.string().max(100), periodStart: z.string().nullable(), periodEnd: z.string().nullable(),
+  metric: z.string().max(300), unit: z.string().max(100), basis: z.enum(['absolute', 'relative', 'estimated', 'unknown']),
+  sampleScope: z.string().max(1000), mapping: z.record(z.string(), z.string()), headers: z.array(z.string()).max(100),
+  mappingVersion: z.string().default(''),
+  rowCount: z.number().int().nonnegative(), acceptedRows: z.number().int().nonnegative(),
+  reviewRows: z.number().int().nonnegative(), rejectedRows: z.number().int().nonnegative(),
+  externalAiAllowed: z.boolean(), publicationAllowed: z.boolean(), warnings: z.array(z.string()),
+  importedAt: z.string().datetime(),
+});
+export type ConsumerDataset = z.infer<typeof consumerDatasetSchema>;
+export const consumerObservationSchema = z.object({
+  schemaVersion: z.literal(1), id, projectId: id, datasetId: id, sourceRow: z.number().int().positive(),
+  rawRecord: z.record(z.string(), z.string()), importStatus: z.enum(['accepted', 'needs_review', 'rejected']),
+  reason: z.string().nullable(), query: z.string().nullable(), text: z.string().nullable(),
+  metric: z.string().nullable(), value: z.number().nullable(), unit: z.string().nullable(),
+  basis: z.enum(['absolute', 'relative', 'estimated', 'unknown']), period: z.string().nullable(),
+  market: z.string(), relationType: z.string().nullable(), relatedQuery: z.string().nullable(),
+  sampleScope: z.string().nullable(), observedAt: z.string().nullable(),
+});
+export type ConsumerObservation = z.infer<typeof consumerObservationSchema>;
 export const comparisonSchema = z.object({
   id, competitor: shortText, criterion: shortText, ownClaimIds: z.array(id),
   otherClaimIds: z.array(id), comparable: z.boolean(),
@@ -103,6 +128,8 @@ export const projectSchema = z.object({
   inputRevision: z.number().int().nonnegative(), evidenceRevision: z.number().int().nonnegative(),
   revision: z.number().int().nonnegative(),
   sources: z.array(sourceSchema), claims: z.array(claimSchema), questions: z.array(questionSchema),
+  consumerDatasets: z.array(consumerDatasetSchema).default([]),
+  consumerObservations: z.array(consumerObservationSchema).default([]),
   comparisons: z.array(comparisonSchema), recommendations: z.array(recommendationSchema),
   answerPlans: z.array(answerPlanSchema).default([]),
   analysisHistory: z.array(z.object({ inputRevision: z.number().int(), evidenceRevision: z.number().int(), at: z.string().datetime(),
@@ -144,7 +171,7 @@ export const projectSchema = z.object({
   contentRequestChannels: z.array(z.enum(channels)).default([]),
   importReceipts: z.array(z.object({ requestId: id, contract: z.string(), responseHash: id, at: z.string().datetime() })).default([]),
   missingEvidence: z.array(z.string()).default([]),
-  manualResearchRequestId: z.string().nullable(), manualContentRequestId: z.string().nullable(),
+  manualResearchRequestId: z.string().nullable(), manualResearchInputHash: z.string().nullable().default(null), manualContentRequestId: z.string().nullable(),
   previousDraft: z.string().nullable(), migrationNote: z.string().nullable(),
   createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
 });
@@ -155,16 +182,21 @@ export function assertProjectRelations(project: Project): void {
   const claimIds = new Set(project.claims.map(item => item.id));
   const comparisonIds = new Set(project.comparisons.map(item => item.id));
   const questionIds = new Set(project.questions.map(item => item.id));
+  const datasetIds = new Set(project.consumerDatasets.map(item => item.id));
+  const observationIds = new Set(project.consumerObservations.map(item => item.id));
   const historicalQuestionIds = new Set([...questionIds, ...project.analysisHistory.flatMap(snapshot => snapshot.questions.map(q => q.id))]);
   if (sourceIds.size !== project.sources.length || claimIds.size !== project.claims.length ||
       comparisonIds.size !== project.comparisons.length ||
       new Set(project.questions.map(item => item.id)).size !== project.questions.length ||
-      new Set(project.recommendations.map(item => item.id)).size !== project.recommendations.length) {
+      new Set(project.recommendations.map(item => item.id)).size !== project.recommendations.length ||
+      datasetIds.size !== project.consumerDatasets.length || observationIds.size !== project.consumerObservations.length) {
     throw new Error('자료 번호가 중복되어 작업을 저장할 수 없습니다.');
   }
   if (project.sources.some(item => item.projectId !== project.id) ||
+      project.consumerDatasets.some(item => item.projectId !== project.id) ||
+      project.consumerObservations.some(item => item.projectId !== project.id || !datasetIds.has(item.datasetId)) ||
       project.claims.some(item => item.projectId !== project.id || (item.sourceId && !sourceIds.has(item.sourceId))) ||
-      project.questions.some(item => item.sourceIds.some(id => !sourceIds.has(id))) ||
+      project.questions.some(item => item.sourceIds.some(id => !sourceIds.has(id)) || item.observationIds?.some(id => !observationIds.has(id))) ||
       project.comparisons.some(item => [...item.ownClaimIds, ...item.otherClaimIds].some(id => !claimIds.has(id))) ||
       project.recommendations.some(item => item.claimIds.some(id => !claimIds.has(id)) ||
         item.comparisonIds.some(id => !comparisonIds.has(id))) ||
@@ -235,6 +267,12 @@ export const researchV3Schema = researchV2Schema.extend({
   })).default([]),
 });
 export type ResearchV3Import = z.infer<typeof researchV3Schema>;
+export const researchV4Schema = researchV3Schema.extend({
+  contract: z.literal('alc.research.v4'),
+  projectId: id, inputHash: id,
+  questions: z.array(researchV2Schema.shape.questions.element.extend({ observationRefs: z.array(id).default([]) })),
+});
+export type ResearchV4Import = z.infer<typeof researchV4Schema>;
 export const contentImportSchema = z.object({
   contract: z.literal('alc.content.v1'), requestId: id,
   documents: z.array(z.object({
@@ -262,7 +300,8 @@ export function newProject(input: Pick<Project, 'name' | 'kind' | 'description' 
     ...input, schemaVersion: 2, id: crypto.randomUUID(), ownerId: 'local', market: 'KR', language: 'ko',
     inputRevision: 1, evidenceRevision: 0, revision: 0,
     sources: [], claims: [], questions: [], comparisons: [], recommendations: [], answerPlans: [], documents: {}, documentHistory: {},
-    manualResearchRequestId: null, manualContentRequestId: null,
+    consumerDatasets: [], consumerObservations: [],
+    manualResearchRequestId: null, manualResearchInputHash: null, manualContentRequestId: null,
     previousDraft: null, migrationNote: null, createdAt: now, updatedAt: now,
   });
 }

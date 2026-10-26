@@ -1,5 +1,6 @@
 import { type Project } from '@/domain/schema';
 import { buildStrategy, comparisonAssessment } from '@/domain/analysis/strategy';
+import { questionEvidenceLabel } from '@/domain/consumer-data';
 import styles from './Review.module.css';
 
 export function AnalysisSummary({ project }: { project: Project }) {
@@ -7,8 +8,8 @@ export function AnalysisSummary({ project }: { project: Project }) {
   return <section className={styles.summary} aria-labelledby="analysis-summary">
     <div className={styles.summaryTitle}><h2 id="analysis-summary">고객 질문별 답변과 채널 계획</h2><span className="badge">{strategy.objective}</span></div>
     <div className={styles.overview}>
-      <div className={styles.focus}><span className="eyebrow">먼저 전할 이야기</span><p>{strategy.focus}</p>
-        <span className="small muted">{strategy.eligible.length ? `공개 사용을 확인한 자사 사실 ${strategy.eligible.length}개` : '자료 보완용 구성안으로 시작할 수 있습니다.'}</span></div>
+      <div className={styles.focus}><span className="eyebrow">질문 우선순위 판단</span><p>{strategy.focus}</p>
+        <span className="small muted">{strategy.eligible.length ? `공개 사용을 확인한 자사 사실 ${strategy.eligible.length}개 · 질문 우선순위와는 별도` : '자료 보완용 구성안으로 시작할 수 있습니다.'}</span></div>
       <div className={styles.audience}><span className="small muted">누구에게 필요한가</span><h3>{strategy.audience}</h3><span className="badge warn">{strategy.audienceLabel}</span></div>
     </div>
     <div className={styles.summaryRows}>
@@ -16,7 +17,7 @@ export function AnalysisSummary({ project }: { project: Project }) {
         const plan = project.answerPlans.find(item => item.questionId === question.id);
         const claims = plan?.claimIds.map(id => project.claims.find(c => c.id === id)).filter(c => c !== undefined) || [];
         return <article key={question.id} className={styles.answerCard}>
-          <strong>{question.text}</strong> <span className="small muted">{question.provenance === 'observed' ? '관찰' : question.provenance === 'reconstructed' ? '자료 기반 재구성' : '가설'}</span>
+          <strong>{question.text}</strong> <span className="small muted">{questionEvidenceLabel(project, question)}</span>
           {question.situation && <p>상황: {question.situation}{question.need ? ` · 필요한 것: ${question.need}` : ''}</p>}
           {question.painPoint && <p>막히는 지점: {question.painPoint}</p>}
           <p><strong>답변 방향:</strong> {plan?.directAnswer || '이 질문에 답할 근거와 적용 모델을 조사해야 합니다.'}
@@ -31,7 +32,7 @@ export function AnalysisSummary({ project }: { project: Project }) {
         </article>;
       }) : <p className="muted">아직 목표 질문이 없습니다. 고객 상황에 맞는 질문부터 조사해 주세요.</p>}</div></div>
       <div><h3>이번에 답할 질문</h3>{project.questions.length ? <ul>{project.questions.slice(0, 12).map(q => <li key={q.id}>
-        {q.text} <span className="small muted">{q.provenance === 'observed' ? '관찰한 질문' : q.provenance === 'reconstructed' ? '자료에서 재구성' : '조사할 가설'}
+        {q.text} <span className="small muted">{questionEvidenceLabel(project, q)}
           {q.situation ? ` · ${q.situation}` : ''}</span></li>)}</ul> : <p className="muted">질문 자료가 없습니다. 이번 목적에 맞는 고객 질문을 조사해 주세요.</p>}</div>
       <div><h3>아직 해결되지 않은 요구</h3>{project.researchInsights.unmetNeeds.length ? <ul>{project.researchInsights.unmetNeeds.map((item, index) =>
         <li key={`${item.situation}-${index}`}>{item.situation}: {item.need} <span className="small muted">{item.provenance === 'observed' ? '관찰' : '추가 확인 필요'}</span></li>)}</ul>

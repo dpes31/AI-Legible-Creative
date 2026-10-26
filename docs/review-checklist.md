@@ -1,5 +1,15 @@
 # 검수 기록
 
+## 2026-10-26 소비자 자료 가져오기·동의 경계 (로컬 검수)
+
+- 검수 대상: `refactor/evidence-workflow-v2`의 소비자 자료 기반 분석 변경. 이 기록을 추가할 때 커밋 전이며 SHA와 원격 CI/Preview는 확인 전이다.
+- `npm ci` 성공. `npm run lint` 성공(경고 없음), `npm run typecheck` 성공, `npm test` 17개 파일·82개 통과, `npm run build` 성공.
+- `npm run test:e2e -- --project=chromium`은 9개가 모두 Playwright Chromium 실행 파일 부재로 브라우저 시작 전에 중단됐다(`/root/.cache/ms-playwright/chromium_headless_shell-1248/...`). 9개 기능 실패가 아니라 UI 검수 **미실행**으로 분류한다. CI 브라우저 실행은 아직 확인하지 않았다.
+- 소비자 자료 검사는 허구 CSV·XLSX fixture로 수행했다. BOM·인용부호/개행·한국어 열 매핑·원본 행 보존·0과 결측 구분·수식 미실행·압축 해제 크기 초과·중복 가져오기 방지·외부 AI 동의·공개 사용 동의·잘못된 수치 행의 보류를 검사했다. 실제 검색/상담/리뷰 자료의 대표성이나 실제 코웨이 소비자 니즈 분석은 검수하지 않았다. 기존 분석 뒤에도 자료 추가 창을 열 수 있게 E2E를 보강했지만, 브라우저가 없어 실행되지는 않았다.
+- `alc.research.v4`는 요청 프로젝트와 입력 hash가 다르거나 공유되지 않은 행을 관찰 근거로 참조하면 거부한다. 외부 제공 불허 자료는 조사 요청문과 외부 입력 hash에서 제외하고, 공개 사용 불허 자료 및 그 자료에서 파생된 질문은 작성 요청문에서 제외하는 단위 회귀가 통과했다. 검색량을 생성형 AI 질문 빈도로 해석하지 않도록 요청문과 상태 표시를 검사했다.
+- `npm audit --omit=dev` 취약점 0건. 전체 audit에는 Tailwind 3 개발 의존성 경로의 중간 심각도 권고 3건이 남는다. `brace-expansion` 고위험 건은 lockfile에서 1.1.21로 갱신했으며 `npm ci`로 재현 설치했다. 해결안이 Tailwind 4 메이저 전환을 요구하는 경고는 이 작업에서 강제로 적용하지 않았다. ESLint 10은 일부 기존 lint plugin의 peer 범위와 맞지 않아 올리지 않았으며, ESLint 9 지원 종료 문제는 별도 호환성 업그레이드 과제로 남긴다.
+- API 호출·비용 0회. 실제 사용자 데이터·실제 제품 원문 의미 검증·실기기 모바일 검수·원격 CI·Preview는 미실행/미확인이다. 최신 SHA가 생성되면 이 검수 항목을 CI와 Preview 결과로 보완한다.
+
 ## 2026-10-23 원격 CI와 실제품 자료 범위
 
 - 검수 커밋 `2c7599035420858c98a94be3d9266218132e71f7`의 [CI 39867804690](https://github.com/dpes31/AI-Legible-Creative/actions/runs/39867804690): `npm ci`, lint, typecheck, Vitest 64개, Playwright Chromium·WebKit 16개, build 모두 통과. 브라우저 검사는 허구 자료의 모바일 수동 흐름에서 근거 없는 효능이 최종본으로 통과하지 않는 사례를 포함한다. 실제 iPhone·Android 기기와 MS Word 앱은 실행하지 않았다.

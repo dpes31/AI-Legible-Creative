@@ -13,7 +13,13 @@ const briefSchema = z.object({
   objective: z.string(), audience: z.object({ text: z.string(), confirmed: z.boolean() }),
   userDescription: z.object({ text: z.string(), state: z.literal('user_assertion') }),
   questions: z.array(z.object({ id: z.string(), text: z.string(), provenance: z.string(), situation: z.string(),
-    need: z.string(), painPoint: z.string(), decisionCriteria: z.array(z.string()) })),
+    need: z.string(), painPoint: z.string(), decisionCriteria: z.array(z.string()),
+    observationIds: z.array(z.string()), observationLinkStatus: z.string() })),
+  consumerEvidence: z.array(z.object({ datasetId: z.string(), fileName: z.string(), dataType: z.string(), provider: z.string(),
+    market: z.string(), periodStart: z.string().nullable(), periodEnd: z.string().nullable(), metric: z.string(), unit: z.string(),
+    basis: z.string(), sampleScope: z.string(), rowId: z.string(), sourceRow: z.number(), query: z.string().nullable(),
+    text: z.string().nullable(), value: z.number().nullable(), rowUnit: z.string().nullable(), period: z.string().nullable(),
+    publicationAllowed: z.boolean(), rawRecord: z.record(z.string(), z.string()) })),
   allowedClaims: z.array(z.object({ id: z.string(), statement: z.string(), subject: z.string(), conditions: z.string(),
     quote: z.string(), sourceTitle: z.string(), sourceUrl: z.string().nullable(), publishedAt: z.string().nullable(),
     sourceType: z.string(), sourceHash: z.string() })),
@@ -57,8 +63,36 @@ export function buildContentBrief(project: Project, requestId: string, selected:
   const comparisons = reviewed.map(({ item, check }) => ({ competitor: item.competitor, criterion: item.criterion,
     state: check.reviewed ? check.label : '비교 미확인', reason: check.reviewed ? item.reason : check.reason,
     conditions: check.reviewed ? item.review?.conditions || '' : '' }));
-  const questions = project.questions.map(q => ({ id: q.id, text: q.text, provenance: q.provenance,
-    situation: q.situation || '', need: q.need || '', painPoint: q.painPoint || '', decisionCriteria: q.decisionCriteria || [] }));
+  const questions = project.questions.flatMap(q => {
+    if (q.provenance === 'observed' && !q.observationIds?.length) return [];
+    const sharedIds = (q.observationIds || []).filter(id => {
+      const row = project.consumerObservations.find(item => item.id === id);
+      return row?.importStatus === 'accepted' && project.consumerDatasets.some(dataset => dataset.id === row.datasetId && dataset.externalAiAllowed);
+    });
+    const linked = (q.observationIds || []).length > 0;
+    const publicationRestricted = (q.observationIds || []).some(id => {
+      const row = project.consumerObservations.find(item => item.id === id);
+      return !row || !project.consumerDatasets.some(dataset => dataset.id === row.datasetId && dataset.publicationAllowed);
+    });
+    // A question derived from private or analysis-only source rows can itself
+    // disclose those rows, even when the row text is removed from the brief.
+    if (linked && (!sharedIds.length || publicationRestricted)) return [];
+    return [{ id: q.id, text: q.text, provenance: q.provenance,
+      situation: q.situation || '', need: q.need || '', painPoint: q.painPoint || '', decisionCriteria: q.decisionCriteria || [],
+      observationIds: sharedIds, observationLinkStatus: linked && !sharedIds.length ? 'linked_but_not_shared' :
+        q.observationLinkStatus || 'not_applicable' }];
+  });
+  const sharedObservationIds = new Set(questions.flatMap(question => question.observationIds));
+  const consumerEvidence = project.consumerObservations.filter(row => sharedObservationIds.has(row.id) && row.importStatus === 'accepted')
+    .map(row => {
+      const dataset = project.consumerDatasets.find(item => item.id === row.datasetId);
+      if (!dataset) return null;
+      return { datasetId: dataset.id, fileName: dataset.fileName, dataType: dataset.dataType, provider: dataset.provider,
+        market: dataset.market, periodStart: dataset.periodStart, periodEnd: dataset.periodEnd, metric: dataset.metric,
+        unit: dataset.unit, basis: dataset.basis, sampleScope: dataset.sampleScope, rowId: row.id, sourceRow: row.sourceRow,
+        query: row.query, text: row.text, value: row.value, rowUnit: row.unit, period: row.period,
+        publicationAllowed: dataset.publicationAllowed, rawRecord: row.rawRecord };
+    }).filter(row => row !== null);
   const base = { contract: 'alc.brief.v1' as const, projectId: project.id, requestId,
     inputRevision: project.inputRevision, evidenceRevision: project.evidenceRevision,
     insightRevision: project.insight.revision, brandRuleRevision: project.brandRuleRevision,
@@ -66,8 +100,8 @@ export function buildContentBrief(project: Project, requestId: string, selected:
     entity: { name: project.name, model: project.model, brandName: project.brandName, category: project.category,
       youtubePrefix: project.youtubePrefix, officialUrl: project.officialUrl, market: project.market, language: project.language },
     objective: project.objective, audience: { text: project.audience, confirmed: !project.audienceUndecided },
-    userDescription: { text: project.description, state: 'user_assertion' as const }, questions, allowedClaims, draftClaims,
-    answerPlans: project.answerPlans.filter(p => project.questions.some(q => q.id === p.questionId))
+    userDescription: { text: project.description, state: 'user_assertion' as const }, questions, consumerEvidence, allowedClaims, draftClaims,
+    answerPlans: project.answerPlans.filter(p => questions.some(q => q.id === p.questionId))
       .map(p => ({ questionId: p.questionId, directAnswer: p.directAnswer, applicableModel: p.applicableModel,
         alternatives: p.alternatives, selectionReason: p.selectionReason, limitations: p.limitations,
         contentGap: p.contentGap, claimIds: p.claimIds.filter(id => allowedIds.has(id) || candidateIds.has(id)),
@@ -88,5 +122,6 @@ export function buildContentBrief(project: Project, requestId: string, selected:
       directions: project.answerPlans.flatMap(answer => answer.channels.filter(d => d.channel === p.channel)
         .map(d => ({ questionId: answer.questionId, angle: d.angle, depth: d.depth }))) })),
   };
+  if (JSON.stringify(base).length > 45_000) throw new Error('작성 요청문에 연결된 소비자 원문 자료가 너무 많습니다. 질문에 직접 필요한 행만 연결한 뒤 다시 만들어 주세요. 일부 자료를 몰래 생략하지 않았습니다.');
   return briefSchema.parse(base);
 }

@@ -21,6 +21,28 @@ test('입력 중 이동·새로고침과 분석 후 복귀에도 값이 유지�
   await expect(page.getByRole('heading', { name: '브랜드 분석: 허구 저장 시험 의자' })).toBeVisible();
 });
 
+test('소비자 자료를 실제 화면에서 가져오고 외부 제공 동의가 없으면 조사 요청문에서 제외한다', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('무엇을 알리고 싶으신가요?').fill('허구 검색자료 검수 제품');
+  await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
+  await expect(page.getByRole('heading', { name: '브랜드 분석: 허구 검색자료 검수 제품' })).toBeVisible();
+  await page.getByLabel('자료 파일').setInputFiles({ name: 'private-search.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('검색어,검색량\n비공개 테스트 키워드,7', 'utf8') });
+  await expect(page.getByRole('status').filter({ hasText: '1개 행과 2개 열을 읽었습니다' })).toBeVisible();
+  await page.getByLabel('표본·집계 범위').fill('허구 검수용 검색 자료 한 행');
+  await expect(page.getByLabel('익명화와 이용 권한을 확인했습니다. 이 자료의 원문 행을 외부 AI 조사 요청문에 포함합니다.')).not.toBeChecked();
+  await page.getByRole('button', { name: '이 자료를 분석에 추가' }).click();
+  await expect(page.getByLabel('저장된 소비자 자료')).toContainText('private-search.csv');
+  await expect(page.getByRole('status').filter({ hasText: '이 브라우저에 저장됨' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('저장된 소비자 자료')).toContainText('private-search.csv');
+  await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
+  const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
+  expect(prompt).toContain('외부 AI에 전달하지 않은 비공개 데이터셋 1개');
+  expect(prompt).not.toContain('비공개 테스트 키워드');
+  expect(prompt).not.toContain('private-search.csv');
+});
+
 test('질문별 분석과 같은 출처의 발췌를 한 번에 살펴보고 검토용 작성으로 이동한다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
@@ -28,7 +50,7 @@ test('질문별 분석과 같은 출처의 발췌를 한 번에 살펴보고 검
   await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
   await page.getByRole('button', { name: '조사 요청문 만들기' }).click();
   const prompt = await page.getByLabel('외부 AI에 보낼 요청문').inputValue();
-  expect(prompt).toContain('alc.research.v3');
+  expect(prompt).toContain('alc.research.v4');
   const requestId = prompt.match(/요청 ID: ([\w-]+)/)?.[1];
   expect(requestId).toBeTruthy();
   const research = { contract: 'alc.research.v3', requestId, entity: { name: '가상 트리플체어' },
@@ -49,6 +71,8 @@ test('질문별 분석과 같은 출처의 발췌를 한 번에 살펴보고 검
   await page.getByLabel('AI에서 받은 조사 결과 붙여넣기').fill(JSON.stringify(research));
   await page.getByRole('button', { name: '조사 내용 가져오기' }).click();
   await expect(page.locator('section[aria-labelledby="analysis-summary"] p').filter({ hasText: '일반형 A의 등 안마는 확인 후보입니다.' })).toBeVisible();
+  await page.getByText('소비자·검색 자료 보완').click();
+  await expect(page.getByLabel('자료 파일')).toBeVisible();
   await page.getByText('자료와 근거 살펴보기', { exact: false }).click();
   await expect(page.getByRole('textbox', { name: '이 출처의 실제 본문 또는 관련 원문 구간' })).toHaveCount(1);
   await page.getByLabel('수정할 방향').fill('일반형 A를 먼저 설명해 주세요.');
