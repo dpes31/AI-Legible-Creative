@@ -1,5 +1,13 @@
 # 검수 기록
 
+## 2026-10-26 소비자 자료 경로 원격 검수 업데이트
+
+- 원격 테스트 브랜치 `refactor/evidence-workflow-v2`의 코드 SHA `2b9200c5db98d241ea1047cf74632b7c250190ba`; 로컬과 원격 트리 `8e5ee178ac52df812760b9f9a875b3a79aa88b7c` 일치. Draft PR #2는 main을 대상으로 열린 초안 상태이며 병합하지 않았다.
+- GitHub Actions [run 40321758044](https://github.com/dpes31/AI-Legible-Creative/actions/runs/40321758044): `npm ci`, lint, typecheck, 단위 테스트 통과. Chromium·WebKit 설치 단계가 아직 실행 중이며 E2E/build 결과는 완료 전이므로 미확정이다. 로컬 Chromium E2E는 브라우저 바이너리 부재로 미실행이다.
+- Vercel Preview `https://ai-legible-creative-ebwkj2hyk-dpes31s-projects.vercel.app/`은 해당 SHA에서 READY로 확인했다. Vercel 연결이 보호된 페이지 본문 읽기를 403으로 거부해 이 연결로 화면 클릭 검수는 하지 못했다. 소유자 인증 계정에서 직접 확인이 필요하다.
+- 소비자 자료 import는 허구 CSV/XLSX fixture로만 검수했다. 실제 검색·상담 자료 대표성, 코웨이 소비자 니즈의 실무 타당성, 제품 페이지 원문 의미, 외부 AI 산출물의 품질은 미검수다. 이 구현은 수요 자료를 보존·동의 분리·요청문에 안전하게 연결하는 기반이며 GEO 성과를 증명하지 않는다.
+- 실제 AI API 호출·비용 0, 운영 DB/환경/배포 변경 0, 실기기 모바일 검수 미실행.
+
 ## 2026-10-26 소비자 자료 가져오기·동의 경계 (로컬 검수)
 
 - 검수 대상 코드 커밋: `d6377ed8f80285614b4471342dfb211b1ab80d03` (`refactor/evidence-workflow-v2`). 보안 lockfile 커밋은 `0fdd90ed0b2bb42b4e3f32639e5965fc9f665fce`. 이 커밋들은 아직 원격에 push되지 않아 원격 CI/Preview는 확인 전이다.
