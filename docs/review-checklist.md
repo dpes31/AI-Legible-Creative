@@ -2,7 +2,7 @@
 
 ## 2026-10-26 소비자 자료 가져오기·동의 경계 (로컬 검수)
 
-- 검수 대상: `refactor/evidence-workflow-v2`의 소비자 자료 기반 분석 변경. 이 기록을 추가할 때 커밋 전이며 SHA와 원격 CI/Preview는 확인 전이다.
+- 검수 대상 코드 커밋: `d6377ed8f80285614b4471342dfb211b1ab80d03` (`refactor/evidence-workflow-v2`). 보안 lockfile 커밋은 `0fdd90ed0b2bb42b4e3f32639e5965fc9f665fce`. 이 커밋들은 아직 원격에 push되지 않아 원격 CI/Preview는 확인 전이다.
 - `npm ci` 성공. `npm run lint` 성공(경고 없음), `npm run typecheck` 성공, `npm test` 17개 파일·82개 통과, `npm run build` 성공.
 - `npm run test:e2e -- --project=chromium`은 9개가 모두 Playwright Chromium 실행 파일 부재로 브라우저 시작 전에 중단됐다(`/root/.cache/ms-playwright/chromium_headless_shell-1248/...`). 9개 기능 실패가 아니라 UI 검수 **미실행**으로 분류한다. CI 브라우저 실행은 아직 확인하지 않았다.
 - 소비자 자료 검사는 허구 CSV·XLSX fixture로 수행했다. BOM·인용부호/개행·한국어 열 매핑·원본 행 보존·0과 결측 구분·수식 미실행·압축 해제 크기 초과·중복 가져오기 방지·외부 AI 동의·공개 사용 동의·잘못된 수치 행의 보류를 검사했다. 실제 검색/상담/리뷰 자료의 대표성이나 실제 코웨이 소비자 니즈 분석은 검수하지 않았다. 기존 분석 뒤에도 자료 추가 창을 열 수 있게 E2E를 보강했지만, 브라우저가 없어 실행되지는 않았다.
