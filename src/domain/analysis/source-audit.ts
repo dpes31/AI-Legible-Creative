@@ -31,6 +31,8 @@ export function inspectSource(source: Source, quote: string) {
   if (new Set(source.snapshots?.map(item => item.id)).size !== (source.snapshots?.length || 0))
     reasons.push('스냅샷 ID가 중복되어 수집 이력을 확인할 수 없습니다.');
   const hashMatches = !!source.body && fingerprint(source.body) === source.hash;
+  const snapshotMatches = !!snapshot && snapshot.sha256 === snapshotHash(snapshot.text) &&
+    snapshot.sha256 === snapshotHash(source.body) && snapshot.text === source.body;
   const originalAvailable = source.origin !== 'external_response' && !!source.body.trim() && source.retrieval !== 'failed';
   const quoteFound = !!quote.trim() && normalize(source.body).includes(normalize(quote));
   if (!originalAvailable) reasons.push('원문 수집 실패 또는 외부 AI 발췌만 존재합니다.');
@@ -42,7 +44,7 @@ export function inspectSource(source: Source, quote: string) {
       reasons.push('출처 분류·발행자 수집 기록이 없습니다. 원출처와 재대조해 주세요.');
     else if (JSON.stringify(metadataFields(snapshot.sourceMetadata)) !== JSON.stringify(metadataFields(sourceMetadata(source))))
       reasons.push('출처 분류·발행자 등 메타데이터가 수집 기록과 다릅니다. 원출처와 재대조해 주세요.');
-    if (snapshot.sha256 !== snapshotHash(snapshot.text) || snapshot.sha256 !== snapshotHash(source.body) || snapshot.text !== source.body)
+    if (!snapshotMatches)
       reasons.push('SHA-256 스냅샷과 저장 원문이 다릅니다.');
     if (snapshot.url !== source.url || snapshot.capturedAt !== source.collectedAt ||
       snapshot.retrieval !== source.retrieval || snapshot.publishedAt !== source.publishedAt)
@@ -51,7 +53,7 @@ export function inspectSource(source: Source, quote: string) {
       reasons.push('출처 URL 또는 확보한 본문 범위를 확인하지 못했습니다.');
     if (snapshot.retrieval === 'failed') reasons.push('스냅샷의 수집 결과가 실패입니다.');
   }
-  return { hashMatches, originalAvailable, quoteFound, snapshot, reasons,
+  return { hashMatches, snapshotMatches, originalAvailable, quoteFound, snapshot, reasons,
     state: reasons.length ? 'hold' as const : 'needs_semantic_review' as const };
 }
 

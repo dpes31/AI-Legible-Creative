@@ -137,6 +137,7 @@ describe('PoC 1단계 승인 경로', () => {
       if (field === 'duplicateGroupId') source.duplicateGroupId = 'changed-group';
       expect(source.hash).toBe(fingerprint(source.body));
       expect(snapshotHash(source.body)).toBe(originalSnapshot.sha256);
+      expect(inspectSource(source, p.claims[0].quote).snapshotMatches).toBe(true);
       expect(inspectSource(source, p.claims[0].quote).reasons).toContain('출처 분류·발행자 등 메타데이터가 수집 기록과 다릅니다. 원출처와 재대조해 주세요.');
       expect(isVerifiedClaim(p, p.claims[0])).toBe(false);
       expect(() => verifyClaim(p, 'c', note)).toThrow('메타데이터');

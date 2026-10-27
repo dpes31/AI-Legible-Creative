@@ -21,7 +21,8 @@ export function SourceEvidencePanel({ project, source, update, onError }: {
     <p className="small">현재 출처 분류: {source.sourceType} · 발행자: {source.publisher || '미확인'}</p>
     <p className="small">수집 당시 출처 분류: {current?.sourceMetadata?.sourceType || '기록 없음'} · 발행자: {current?.sourceMetadata ? current.sourceMetadata.publisher || '미확인' : '기록 없음'}</p>
     <p className="small">수집 범위: {current?.locator || '미확인'} · {current?.coverage || 'unknown'} · 이해관계: {current?.interest || '미확인'}</p>
-    <p className="small">무결성: {check.state === 'hold' ? '보류' : '저장 원문과 SHA-256 스냅샷 일치'}</p>
+    <p className="small">본문 무결성: {check.hashMatches && check.snapshotMatches ? '저장 원문과 SHA-256 스냅샷 일치' : '보류'}</p>
+    <p className="small">수집 증적·출처 대조: {check.state === 'hold' ? '보류' : '입력 기록 일치 · 발행자 진위 인증 아님'}</p>
     {check.reasons.map(reason => <p key={reason} className="small">{reason}</p>)}
     <p className="small muted">해시 일치는 출처 진위·주장 의미의 승인이 아닙니다. 부분 원문 밖의 정보는 판단하지 않습니다.</p>
     <pre className="output">{source.body || source.excerpt || '저장된 본문 없음'}</pre>

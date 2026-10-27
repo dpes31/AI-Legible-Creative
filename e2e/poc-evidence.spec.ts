@@ -125,6 +125,13 @@ test('실제 승인 자료의 출처 분류·발행자 변경: 이전 승인 무
     expect(reopened.sources[0].snapshots.at(-1).sha256).toBe(saved.sources[0].snapshots.at(-1).sha256);
     await restored.goto('/review'); await restored.reload(); await restored.locator('#evidence > summary').click();
     await expect(restored.locator('#evidence article')).toContainText('보류');
+    const fold = restored.locator('details').filter({ has: restored.locator('summary').filter({ hasText: /^제품 원문 자료 더하기/ }) });
+    if ((await fold.getAttribute('open')) === null) await fold.locator(':scope > summary').click();
+    const savedSources = fold.locator('details').filter({ has: restored.locator('summary').filter({ hasText: /^저장한 자료/ }) });
+    if ((await savedSources.getAttribute('open')) === null) await savedSources.locator(':scope > summary').click();
+    await savedSources.getByText('저장된 원문과 수집 증적', { exact: true }).click();
+    await expect(savedSources).toContainText('본문 무결성: 저장 원문과 SHA-256 스냅샷 일치');
+    await expect(savedSources).toContainText('수집 증적·출처 대조: 보류');
     await restored.screenshot({ path: testInfo.outputPath('held-' + mutation + '.png'), fullPage: true });
     await context.close();
   }
