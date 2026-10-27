@@ -63,6 +63,9 @@ async function setup(page: Page) {
 test('실제 원자료 UI: 12개 발췌·권한 분리·실패/정상 응답 원본·검토·재열기', async ({ page }, info) => {
   test.setTimeout(180000); const { panel, runFold, response } = await setup(page);
   await runFold.getByLabel('질문 발견 원본 응답').fill('중단된 {');
+  await runFold.getByRole('button', { name: '요청문 외부 제공 기록', exact: true }).click();
+  await expect(runFold.locator(':scope > summary')).toContainText('awaiting_response');
+  await expect(runFold.getByLabel('질문 발견 원본 응답')).toHaveValue('중단된 {');
   await runFold.getByRole('button', { name: '발견 응답 원본 보관·대조', exact: true }).click();
   await expect(runFold).toContainText('invalid');
   await runFold.getByLabel('질문 발견 원본 응답').fill(JSON.stringify(response));
@@ -79,6 +82,11 @@ test('실제 원자료 UI: 12개 발췌·권한 분리·실패/정상 응답 원
   await panel.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^발견 실행 / }) }).first().locator(':scope > summary').click();
   await expect(panel.locator('article')).toContainText('accepted');
   await page.screenshot({ path: info.outputPath('discovery-reopened.png'), fullPage: true });
+  await panel.getByRole('button', { name: '같은 선택 행으로 역순 새 실행', exact: true }).first().click();
+  const retried = await backup(page);
+  expect(retried.questionDiscoveryRuns.at(-1)!.parentRunId).toBe(saved.questionDiscoveryRuns.at(-1)!.id);
+  expect(retried.questionDiscoveryRuns.at(-1)!.selectedRowIds).toEqual([...saved.questionDiscoveryRuns.at(-1)!.selectedRowIds].reverse());
+  expect(retried.questionDiscoveryRuns[1].attempts).toHaveLength(2);
 });
 
 test('실제 원자료 UI: 다른 질문 표기 보류와 메타데이터·권한·요청문 변경 재열기 차단', async ({ page, browser }, info) => {

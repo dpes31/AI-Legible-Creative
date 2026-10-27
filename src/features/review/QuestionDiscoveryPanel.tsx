@@ -39,7 +39,7 @@ export function QuestionDiscoveryPanel({ project, update }: { project: Project; 
       }} /></label>
       <label className="field">발췌 자료명<input value={input.title} onChange={e => set('title', e.target.value)} /></label>
       <label className="field">소비자 원문 URL<input type="url" value={input.url} onChange={e => set('url', e.target.value)} /></label>
-      <label className="field">소비자 원문 발췌<textarea value={input.text} maxLength={5000} onChange={e => set('text', e.target.value)} /></label>
+      <label className="field">소비자 원문 발췌<textarea value={input.text} onChange={e => set('text', e.target.value)} /></label>
       <label className="field">확보 구간·생략 범위<input value={input.locator} onChange={e => set('locator', e.target.value)} /></label>
       <label className="field">발췌 게시일<input type="date" value={input.publishedAt || ''} onChange={e => set('publishedAt', e.target.value || null)} /></label>
       <label className="field">자료의 브랜드 (미확인이면 비움)<input value={input.brand} onChange={e => set('brand', e.target.value)} /></label>
@@ -82,15 +82,22 @@ export function QuestionDiscoveryPanel({ project, update }: { project: Project; 
       const stale = discoveryRunReasons(project, run);
       return <details key={run.id}><summary>발견 실행 {run.createdAt} · {run.status}</summary>
         <p className="small">{run.provider} / {run.model} / 버전 {run.modelVersion} · 모델 확인: {run.modelProvenance}</p>
+        {run.parentRunId && <p className="small source-link">이전 실행: {run.parentRunId}</p>}
+        <button type="button" className="button text" onClick={() => act(() => prepareQuestionDiscovery(project, {
+          rowIds: run.selectedRowIds, provider: run.provider, model: run.model, modelVersion: run.modelVersion,
+          order: 'reverse', parentRunId: run.id }), '원래 실행과 응답을 보존하고 같은 선택 행의 역순 실행을 추가했습니다.')}>같은 선택 행으로 역순 새 실행</button>
         <p className="small source-link">실행 {run.id} · 입력 {run.inputHash} · 요청문 {run.promptHash}</p>
         {stale.map(reason => <p key={reason} className="small">보류: {reason}</p>)}
         {run.excluded.map(row => <p key={row.rowId} className="small">제외 행 {row.rowId}: {row.reasons.join(' ')}</p>)}
         <label className="field">소비자 발견 요청문<textarea readOnly value={run.prompt} /></label>
         <button type="button" className="button text" disabled={!run.prompt || !!stale.length} onClick={() => void navigator.clipboard.writeText(run.prompt).then(() => {
-          act(() => markDiscoveryProvided(project, run.id), '요청문을 복사했습니다. 실제 서비스 전송 완료 증명은 아닙니다.');
+          setNotice('요청문을 복사했습니다. 외부 서비스에 제공한 경우 아래에 별도로 기록해 주세요.'); setError('');
         }).catch(() => setError('복사가 허용되지 않았습니다. 요청문을 직접 선택해 복사해 주세요.'))}>발견 요청문 복사</button>
-        <label className="field">질문 발견 원본 응답<textarea value={run.responseDraft} maxLength={500000} onChange={e => update({ ...project,
-          questionDiscoveryRuns: project.questionDiscoveryRuns.map(r => r.id === run.id ? { ...r, responseDraft: e.target.value } : r) })} /></label>
+        <button type="button" className="button text" disabled={!run.prompt || !!stale.length} onClick={() => act(() => markDiscoveryProvided(project, run.id), '사용자가 외부 제공을 기록했습니다. 서비스의 전송·실행 완료 인증은 아닙니다.')}>요청문 외부 제공 기록</button>
+        <label className="field">질문 발견 원본 응답<textarea value={run.responseDraft} onChange={e => {
+          if (e.target.value.length > 500000) { setError('응답이 50만 자를 넘어 저장하지 않았습니다. 원본을 파일로 보관해 주세요. 일부만 잘라 저장하지 않습니다.'); return; }
+          update({ ...project, questionDiscoveryRuns: project.questionDiscoveryRuns.map(r => r.id === run.id ? { ...r, responseDraft: e.target.value } : r) });
+        }} /></label>
         <button type="button" className="button secondary" onClick={() => act(() => importQuestionDiscovery(project, run.id, run.responseDraft), '응답 원본과 대조 결과를 보관했습니다. 실패 사유도 실행 이력에 남습니다.')}>발견 응답 원본 보관·대조</button>
         {run.attempts.map(attempt => <details key={attempt.id}><summary>응답 시도 {attempt.at} · {attempt.status}</summary>
           <p className="small">{attempt.responseHash}</p>{attempt.errors.map(reason => <p className="small" key={reason}>{reason}</p>)}
