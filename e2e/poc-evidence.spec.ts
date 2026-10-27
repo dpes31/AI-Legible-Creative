@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
+test.use({ actionTimeout: 10000 });
 const data = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/poc/public-excerpts.json'), 'utf8'));
 
 async function create(page: Page) {

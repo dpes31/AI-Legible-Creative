@@ -12,6 +12,7 @@
 - 원격 구현 체크포인트 b56952d1b3f642dbb1ebd78c246e467781fdc7aa: 로컬 280340fd2a091110b0052d42e1ebcf6b578e00f6과 tree 1f04c99ea0888fe18798450b595b547aea61ef73 일치. GitHub 쓰기 API로 기존 원격 HEAD의 자식 커밋을 만들고 expected_sha·force=false로 반영했다. CI 40525581356에서 npm ci·lint·typecheck·단위 통과, Chromium/WebKit E2E 진행 중이다.
 - 추가 승인 경계: 질문 답변의 근거 저장과 같은 모델 근거 재사용에도 동일한 검사를 적용했다. 외부 AI 후보는 미검증·보류 사유를 유지하고 확정 근거에서는 제외한다. 수집된 타 제품의 주장은 own으로 추정하지 않고 범위 미확정으로 보류한다.
 - 로컬 후속 검수: 전체 18개 파일·99개 단위 통과. 추가 답변 저장·재사용 경계 18개 시험 통과. lint/typecheck 통과. 실제 발췌 UI는 원격 Chromium/WebKit 실행 중이므로 아직 미통과다.
+- 첫 원격 UI 검수 b56952d / CI 40525581356: 기존 Chromium/WebKit 경로 18개 통과, 신규 실자료 4개는 자료 종류 select의 접근성 레이블을 정확히 찾지 못해 timeout. 실제 자료 UI 미통과로 기록한다. label과 select를 htmlFor/id로 분리 연결하고 신규 시험의 액션 timeout을 10초로 설정해 입력 탐색 실패를 빠르게 드러내도록 수정했다. 검사를 건너뛰거나 성공 기대값을 완화하지 않았다.
 - 다음 작업: 이 구현을 원격 테스트 브랜치에 비강제로 보존하고 정확한 SHA의 CI에서 npm ci·단위·Chromium/WebKit의 실제 발췌 UI·기존 회귀·build를 확인한다. UI와 전체 검수가 끝날 때까지 PoC 1단계는 진행 중이다. main·운영 DB·환경변수·유료 API 변경 없음.
 
 ## 2026-10-27 작업 공간 복구와 재개 기준
