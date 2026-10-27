@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { consumerLinkSchema, discoveryCandidateSchema, discoveryRunSchema } from './question-discovery-schema';
 
 export const channels = ['ad_copy', 'product_page', 'press_release', 'youtube_description', 'blog', 'review_video'] as const;
 export type Channel = (typeof channels)[number];
@@ -91,6 +92,7 @@ export const consumerObservationSchema = z.object({
   basis: z.enum(['absolute', 'relative', 'estimated', 'unknown']), period: z.string().nullable(),
   market: z.string(), relationType: z.string().nullable(), relatedQuery: z.string().nullable(),
   sampleScope: z.string().nullable(), observedAt: z.string().nullable(),
+  evidenceLink: consumerLinkSchema.optional(),
 });
 export type ConsumerObservation = z.infer<typeof consumerObservationSchema>;
 export const comparisonSchema = z.object({
@@ -151,6 +153,8 @@ export const projectSchema = z.object({
   sources: z.array(sourceSchema), claims: z.array(claimSchema), questions: z.array(questionSchema),
   consumerDatasets: z.array(consumerDatasetSchema).default([]),
   consumerObservations: z.array(consumerObservationSchema).default([]),
+  questionDiscoveryRuns: z.array(discoveryRunSchema).default([]),
+  questionCandidates: z.array(discoveryCandidateSchema).default([]),
   comparisons: z.array(comparisonSchema), recommendations: z.array(recommendationSchema),
   answerPlans: z.array(answerPlanSchema).default([]),
   analysisHistory: z.array(z.object({ inputRevision: z.number().int(), evidenceRevision: z.number().int(), at: z.string().datetime(),

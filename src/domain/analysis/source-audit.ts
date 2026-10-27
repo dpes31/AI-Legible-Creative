@@ -1,10 +1,8 @@
-import { sha256 } from '@noble/hashes/sha2.js';
+import { snapshotHash } from './evidence-hash';
+import { revalidateDiscovery } from './discovery-integrity';
+export { snapshotHash } from './evidence-hash';
 import type { Claim, Project, Source, SourceSnapshot } from '../schema';
 import { fingerprint, normalize } from '../text';
-
-export function snapshotHash(text: string): string {
-  return 'sha256:' + Array.from(sha256(new TextEncoder().encode(text)), n => n.toString(16).padStart(2, '0')).join('');
-}
 
 function sourceMetadata(source: Source): NonNullable<SourceSnapshot['sourceMetadata']> {
   return { sourceType: source.sourceType, publisher: source.publisher ?? null, title: source.title,
@@ -119,6 +117,7 @@ export function isVerifiedClaim(project: Project, claim: Claim): boolean {
 // Recompute on load, save and analysis use. Never trust a serialized "supported".
 // Preserve original text, prior review and the reason for demotion.
 export function revalidateEvidence(project: Project): Project {
+  project = revalidateDiscovery(project);
   let demoted = false;
   const claims = project.claims.map(claim => {
     const check = inspectClaim(project, claim);

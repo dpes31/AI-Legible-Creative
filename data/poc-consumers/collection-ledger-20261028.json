@@ -1,0 +1,110 @@
+{
+  "collectedAt": "2026-10-27T23:33:31Z",
+  "method": "공개 페이지 웹 텍스트 추출 결과 직접 열람 및 최소 발췌, HTTP/발행자 진위 인증 아님",
+  "sources": [
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=4005160",
+      "publishedAt": "2025-04-13",
+      "sha256": "9a5157c5c3bead40653cefaee2ce5d380c3e20fc966266abbb4b1ec0835b934c",
+      "locator": "본문 질문 문장만. 작성자·IP·댓글·기타 본문 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=4040553",
+      "publishedAt": "2025-06-12",
+      "sha256": "6bb472883efdc4ff1df97cd517edd2ecc4bea204d4356395b40946662a13263c",
+      "locator": "본문 끝의 선택 질문만. 건강 표현·작성자·IP·댓글 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=3164297",
+      "publishedAt": "2021-02-06",
+      "sha256": "2cce92e826d0a38ebc1cf7e777f98e0301b572eb4256c2db60effa583cb292c2",
+      "locator": "구매 방문 중단 문장만. 다른 본문·작성자·IP·댓글 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=2914025",
+      "publishedAt": "2019-12-28",
+      "sha256": "abdc2e6c2c33bfabd2a6a5448612ea94c554f00e1f5503022be2b1a3ba3d876c",
+      "locator": "본문의 소음 문의 한 문장. 모델번호의 정확한 실재 여부 미확인. 다른 본문·IP·댓글 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=3689989",
+      "publishedAt": "2023-08-10",
+      "sha256": "1ac6792b143f7d3869084080696a8f7a3d13c8d7b0cd77472459f95cbdaa89c2",
+      "locator": "본문 원문 구간. 작성자·IP·댓글 제외. 사업/세무 적용 판단은 하지 않음 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://quasarzone.com/bbs/qf_hatv/views/14442",
+      "publishedAt": "2023-05-09",
+      "sha256": "67d6ea917e218d175532033025090a514773ea1554148f622f7301bbf633e7b9",
+      "locator": "질문 제목과 본문 제품 식별 문구를 줄로 구분해 발췌. 다른 본문·프로필·댓글 제외. 회사/단종 사실의 검증이 아님 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://m.puliodays.com/article/review/4/289172/page/20/",
+      "publishedAt": "2026-07-13",
+      "sha256": "4505406740a7e7430d42128dfbc1e6237357ed8beb1f5c91517ef26e549ca875",
+      "locator": "본문 기대 표현 일부. 문장 중간 발췌. 건강 이력·직업·작성자·사진·다른 본문 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://m.puliodays.com/article/review/4/288758/",
+      "publishedAt": "2026-06-13",
+      "sha256": "dff4246c42e4dc37cb0ddac885de60f9dce3ae5af88131f6fce4c58dbe60aa18",
+      "locator": "본문 만족 표현만. 작성자·이미지·주문 정보 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://m.puliodays.com/article/review/4/263918",
+      "publishedAt": "2025-07-29",
+      "sha256": "bc2ef3db2608aab2c2aebbd1551070d981bfd551b6334388ec2bfe9b0ff9a53a",
+      "locator": "본문 첫 문장만. 체험단 표기 보존. 다른 본문·작성자 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://m.puliodays.com/article/review/4/290599/page/12/",
+      "publishedAt": "2026-10-15",
+      "sha256": "85a4b6a3aea4e4cf76a75aaccab0bbc7aad62d8ae9306da6f2bedc2422c56679",
+      "locator": "본문 끝 휴식 표현만. 건강·수술·인체 부위·작성자·사진·다른 본문 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://m.puliodays.com/article/review/4/290509/",
+      "publishedAt": "2026-10-09",
+      "sha256": "5bbd1a2b899b1c1c9f2b0f3926ebc37af053e2fa3da20ff6986c697575299009",
+      "locator": "본문 끝 3문장만. 배송·주문 일자·작성자·사진 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    },
+    {
+      "url": "https://m.puliodays.com/article/review/4/290463/",
+      "publishedAt": "2026-10-07",
+      "sha256": "aa252ac6b2380f8f827c615025cb1b916c5c7a15d16d035930f137ba63b5de6f",
+      "locator": "본문만. 작성자·사진·주문 연계 정보 제외 · 2026-10-28 웹 텍스트 추출 결과 대조; 전체 페이지 수집 아님"
+    }
+  ],
+  "notCollected": [
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=3361087",
+      "reason": "직접 열람 timeout. 검색 발췌를 수집 완료로 대체하지 않음"
+    },
+    {
+      "url": "https://www.82cook.com/entiz/read.php?bn=15&num=2284035",
+      "reason": "직접 열람 timeout"
+    },
+    {
+      "url": "https://rentre.kr/rank/massage-chair",
+      "reason": "직접 열람 실패. 판매자 요약·검색 인용을 소비자 원자료로 확정하지 않음"
+    },
+    {
+      "url": "https://clien.net",
+      "reason": "robots 차단. 우회하지 않음"
+    }
+  ],
+  "queries": [
+    "안마의자 후기 공간 불편 구매 질문 커뮤니티",
+    "안마의자 구매 안하고 의자 휴식 경험 후기",
+    "site:82cook.com 안마의자 의자",
+    "site:m.puliodays.com/article/review 웰워크",
+    "site:quasarzone.com 안마의자"
+  ],
+  "limits": [
+    "소비자 작성물로 표시된 공개 텍스트 최소 발췌. 게시자·구매·발언의 진위 인증이 아니다.",
+    "12개 URL·3개 게시 경로. 풀리오 6/12, 82cook 5/12, 퀘이사존 1/12로 편중돼 우선순위 확정에 부족하다.",
+    "2019~2026 자료가 혼재한다. 현재 모델의 구매 수요·미충족 니즈·제품 성능으로 일반화할 수 없다.",
+    "건강 상세·작성자명·IP·연락처·사진은 보관하지 않는다. 비식별 재검토·외부 제공·공개 사용은 사용자 미승인이다.",
+    "사람이 작성한 질문 후보·분석 정답은 포함하지 않는다."
+  ]
+}
