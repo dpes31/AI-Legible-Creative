@@ -18,6 +18,8 @@ export function SourceEvidencePanel({ project, source, update, onError }: {
   const act = (action: () => Project) => { try { update(action()); onError(''); } catch (error) { onError(error instanceof Error ? error.message : '자료를 저장하지 못했습니다.'); } };
   return <details><summary>저장된 원문과 수집 증적</summary>
     <p className="small">수집 시각: {source.collectedAt} · 게시일: {source.publishedAt || '미확인'} · 수집 결과: {source.retrieval}</p>
+    <p className="small">현재 출처 분류: {source.sourceType} · 발행자: {source.publisher || '미확인'}</p>
+    <p className="small">수집 당시 출처 분류: {current?.sourceMetadata?.sourceType || '기록 없음'} · 발행자: {current?.sourceMetadata ? current.sourceMetadata.publisher || '미확인' : '기록 없음'}</p>
     <p className="small">수집 범위: {current?.locator || '미확인'} · {current?.coverage || 'unknown'} · 이해관계: {current?.interest || '미확인'}</p>
     <p className="small">무결성: {check.state === 'hold' ? '보류' : '저장 원문과 SHA-256 스냅샷 일치'}</p>
     {check.reasons.map(reason => <p key={reason} className="small">{reason}</p>)}

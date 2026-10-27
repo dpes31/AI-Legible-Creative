@@ -6,13 +6,22 @@ export function snapshotHash(text: string): string {
   return 'sha256:' + Array.from(sha256(new TextEncoder().encode(text)), n => n.toString(16).padStart(2, '0')).join('');
 }
 
+function sourceMetadata(source: Source): NonNullable<SourceSnapshot['sourceMetadata']> {
+  return { sourceType: source.sourceType, publisher: source.publisher ?? null, title: source.title,
+    origin: source.origin, fileName: source.fileName ?? null, duplicateGroupId: source.duplicateGroupId ?? null };
+}
+function metadataFields(metadata: SourceSnapshot['sourceMetadata']) {
+  return metadata ? [metadata.sourceType, metadata.publisher, metadata.title, metadata.origin,
+    metadata.fileName, metadata.duplicateGroupId] : null;
+}
+
 // A digest binds saved bytes, not the publisher's identity or the truth of a claim.
 // Metadata is a collector declaration, never an independent authenticity check.
 export function captureSource(source: Source, details: Pick<SourceSnapshot,
   'method' | 'locator' | 'coverage' | 'modelScope' | 'conditionScope' | 'interest'>): Source {
   const snapshot: SourceSnapshot = { ...details, id: crypto.randomUUID(), text: source.body,
     sha256: snapshotHash(source.body), url: source.url, capturedAt: source.collectedAt,
-    publishedAt: source.publishedAt, retrieval: source.retrieval };
+    publishedAt: source.publishedAt, retrieval: source.retrieval, sourceMetadata: sourceMetadata(source) };
   return { ...source, snapshots: [...(source.snapshots || []), snapshot], activeSnapshotId: snapshot.id };
 }
 
@@ -29,6 +38,10 @@ export function inspectSource(source: Source, quote: string) {
   if (!quoteFound) reasons.push('저장 원문에서 인용 구간을 찾지 못했습니다.');
   if (!snapshot) reasons.push('SHA-256 수집 스냅샷이 없습니다. 기존 자료를 원출처와 재대조해 주세요.');
   else {
+    if (!snapshot.sourceMetadata)
+      reasons.push('출처 분류·발행자 수집 기록이 없습니다. 원출처와 재대조해 주세요.');
+    else if (JSON.stringify(metadataFields(snapshot.sourceMetadata)) !== JSON.stringify(metadataFields(sourceMetadata(source))))
+      reasons.push('출처 분류·발행자 등 메타데이터가 수집 기록과 다릅니다. 원출처와 재대조해 주세요.');
     if (snapshot.sha256 !== snapshotHash(snapshot.text) || snapshot.sha256 !== snapshotHash(source.body) || snapshot.text !== source.body)
       reasons.push('SHA-256 스냅샷과 저장 원문이 다릅니다.');
     if (snapshot.url !== source.url || snapshot.capturedAt !== source.collectedAt ||
@@ -54,7 +67,8 @@ export function claimFingerprint(claim: Claim): string {
 export function sourceSnapshotFingerprint(snapshot: SourceSnapshot | undefined): string {
   return snapshotHash(JSON.stringify(snapshot ? [snapshot.id, snapshot.text, snapshot.sha256, snapshot.url,
     snapshot.capturedAt, snapshot.publishedAt, snapshot.retrieval, snapshot.method, snapshot.locator,
-    snapshot.coverage, snapshot.modelScope, snapshot.conditionScope, snapshot.interest] : null));
+    snapshot.coverage, snapshot.modelScope, snapshot.conditionScope, snapshot.interest,
+    metadataFields(snapshot.sourceMetadata)] : null));
 }
 
 export function inspectClaim(project: Project, claim: Claim) {

@@ -16,6 +16,7 @@ async function addSource(page: Page, item: typeof data.release, kind: string, re
   if ((await sourceFold.getAttribute('open')) === null) await sourceFold.locator(':scope > summary').click();
   await page.getByLabel('자료 이름', { exact: true }).fill(item.title);
   await page.getByLabel('원문 링크, 있다면').fill(item.url);
+  if (kind === 'official') await page.getByLabel('발행자 (미확인이면 비움)').fill('코웨이');
   await page.getByLabel('실제 원문', { exact: true }).fill(item.body);
   await page.getByLabel('자료 종류', { exact: true }).selectOption(kind);
   await page.getByLabel('수집 결과', { exact: true }).selectOption(retrieval);
@@ -74,12 +75,59 @@ test('실제 공개 발췌: UI 가져오기·SHA 스냅샷·주장 연결·사�
   expect(saved.sources).toHaveLength(2);
   expect(saved.sources.every((s: { snapshots: unknown[] }) => s.snapshots.length > 0)).toBe(true);
   expect(saved.claims[0].status).toBe('supported'); expect(saved.claims[1].status).toBe('insufficient');
+  expect(saved.sources[0].snapshots.at(-1).sourceMetadata.publisher).toBe('코웨이');
   await page.goto('/review'); await page.reload(); await page.locator('#evidence > summary').click();
   await expect(page.locator('#evidence')).toContainText('자동 대조 + 사람 의미 검토 기록');
   await expect(page.locator('#evidence')).toContainText('적용 조건이 없거나');
   await page.screenshot({ path: testInfo.outputPath('public-evidence-reopened.png'), fullPage: true });
   await testInfo.attach('public-evidence-status', { body: JSON.stringify({ sourceCount: saved.sources.length,
     claims: saved.claims.map((c: { status: string; evidenceHold?: unknown }) => ({ status: c.status, evidenceHold: c.evidenceHold })) }), contentType: 'application/json' });
+});
+
+test('실제 승인 자료의 출처 분류·발행자 변경: 이전 승인 무효화와 UI 재열기', async ({ page, browser }, testInfo) => {
+  test.setTimeout(120000);
+  await create(page);
+  const li = await addSource(page, data.release, 'official');
+  await sourceScope(li, data.release); await claim(li, data.release);
+  await page.locator('#evidence > summary').click();
+  const article = page.locator('#evidence article');
+  await article.getByText('이 주장의 의미와 모델 조건 검토', { exact: true }).click();
+  await article.getByLabel('의미 검토 이유와 한계').fill(data.release.note);
+  await article.getByRole('button', { name: '원문과 의미를 직접 대조했어요' }).click();
+  await expect(article).toContainText('자동 대조 + 사람 의미 검토 기록');
+  const saved = await backup(page);
+  expect(saved.claims[0].status).toBe('supported');
+  for (const mutation of ['sourceType', 'publisher', 'legacyMetadata']) {
+    const changed = structuredClone(saved);
+    if (mutation === 'sourceType') changed.sources[0].sourceType = 'independent';
+    if (mutation === 'publisher') changed.sources[0].publisher = '다른 발행자';
+    if (mutation === 'legacyMetadata') delete changed.sources[0].snapshots.at(-1).sourceMetadata;
+    const context = await browser.newContext(); const restored = await context.newPage();
+    await restored.goto('/settings');
+    await restored.getByLabel('이전에 받은 새 버전 백업 가져오기').setInputFiles({
+      name: 'metadata-changed.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(changed)),
+    });
+    await expect(restored.getByText('백업을 새 작업으로 가져왔습니다.', { exact: false })).toBeVisible();
+    await restored.goto('/review'); await restored.locator('#evidence > summary').click();
+    const held = restored.locator('#evidence article');
+    await expect(held).toContainText('보류');
+    await expect(held).not.toContainText('자동 대조 + 사람 의미 검토 기록');
+    await expect(held).toContainText(mutation === 'legacyMetadata' ? '발행자 수집 기록이 없습니다' : '메타데이터가 수집 기록과 다릅니다');
+    await held.getByText('이 주장의 의미와 모델 조건 검토', { exact: true }).click();
+    await held.getByLabel('의미 검토 이유와 한계').fill(data.release.note);
+    await held.getByRole('button', { name: '원문과 의미를 직접 대조했어요' }).click();
+    await expect(restored.locator('main').getByRole('alert')).toBeVisible();
+    const reopened = await backup(restored);
+    expect(reopened.claims[0].status).toBe('insufficient');
+    expect(reopened.claims[0].review).toEqual(saved.claims[0].review);
+    expect(reopened.sources[0].body).toBe(saved.sources[0].body);
+    expect(reopened.sources[0].hash).toBe(saved.sources[0].hash);
+    expect(reopened.sources[0].snapshots.at(-1).sha256).toBe(saved.sources[0].snapshots.at(-1).sha256);
+    await restored.goto('/review'); await restored.reload(); await restored.locator('#evidence > summary').click();
+    await expect(restored.locator('#evidence article')).toContainText('보류');
+    await restored.screenshot({ path: testInfo.outputPath('held-' + mutation + '.png'), fullPage: true });
+    await context.close();
+  }
 });
 
 test('실제 보도자료 파생 변조: 숫자·hash·실패·모델·조건과 백업 재열기 차단', async ({ page, browser }, testInfo) => {

@@ -13,6 +13,7 @@ export function SourceForm({ project, update, setError, setNotice }: { project: 
   const [retrieval, setRetrieval] = useState<Source['retrieval']>('partial');
   const [locator, setLocator] = useState(''); const [publishedAt, setPublishedAt] = useState('');
   const [interest, setInterest] = useState('미확인');
+  const [publisher, setPublisher] = useState('');
   const addSource = () => {
     if (fileName && project.sources.filter(s => s.fileName).length >= FILE_LIMITS.projectFiles) { setError('프로젝트당 파일은 다섯 개까지 사용할 수 있습니다.'); return; }
     if (!title.trim() || !body.trim()) { setError('자료 이름과 실제 본문을 넣어 주세요. 링크만으로 원문 확인이 끝나지 않습니다.'); return; }
@@ -21,13 +22,13 @@ export function SourceForm({ project, update, setError, setNotice }: { project: 
       if (url.trim()) { const parsed = new URL(url.trim()); if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('invalid url'); }
       const source: Source = {
         id: crypto.randomUUID(), projectId: project.id, title: title.trim(), url: url.trim() || null,
-        excerpt: body, body, sourceType, retrieval,
+        excerpt: body, body, sourceType, retrieval, publisher: publisher.trim() || null,
         origin: 'direct_input', publishedAt: publishedAt || null, collectedAt: new Date().toISOString(), externalAiAllowed: externalUse,
         publicationAllowed: publicUse, fileName: fileName || undefined, hash: fingerprint(body),
       };
       update(storeEvidenceSource(project, source, { method: fileName ? 'file_text' : 'manual_excerpt',
         locator, coverage: 'excerpt', modelScope: [], conditionScope: [], interest }));
-      setTitle(''); setBody(''); setFileName(''); setUrl(''); setExternalUse(false); setPublicUse(false); setError(''); setNotice('자료를 저장했습니다. 이전 조사 요청문은 무효가 되었습니다. 사실과 출처를 확인해 주세요.');
+      setTitle(''); setBody(''); setFileName(''); setUrl(''); setPublisher(''); setExternalUse(false); setPublicUse(false); setError(''); setNotice('자료를 저장했습니다. 이전 조사 요청문은 무효가 되었습니다. 사실과 출처를 확인해 주세요.');
     } catch (error) { setError(error instanceof Error ? error.message : '자료를 저장하지 못했습니다.'); }
   };
 
@@ -46,6 +47,7 @@ export function SourceForm({ project, update, setError, setNotice }: { project: 
       <section><h3>자료 더하기</h3><p className="muted small">원문을 붙여넣거나 글자를 선택할 수 있는 PDF를 올려 주세요. 외부 AI에 전달하는 자료는 따로 확인합니다.</p>
         <div className="field"><label htmlFor="source-title">자료 이름</label><input id="source-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 공식 제품 설명" /></div>
         <div className="field"><label htmlFor="source-url">원문 링크, 있다면</label><input id="source-url" type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://" /></div>
+        <div className="field"><label htmlFor="source-publisher">발행자 (미확인이면 비움)</label><input id="source-publisher" value={publisher} onChange={e => setPublisher(e.target.value)} placeholder="발행 주체명만 입력하고 개인 식별정보는 제외해 주세요." /></div>
         <div className="field"><label htmlFor="source-file">또는 파일로 가져오기</label><input id="source-file" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf" onChange={e => void fileChanged(e.target.files?.[0])} />
           {fileLoading && <span role="status">자료에서 글자를 읽고 있습니다…</span>}</div>
         <div className="field"><label htmlFor="source-body">실제 원문</label><textarea id="source-body" value={body} onChange={e => setBody(e.target.value)} placeholder="확인할 문장과 적용 조건을 원문 그대로 붙여넣어 주세요." /></div>

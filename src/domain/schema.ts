@@ -25,6 +25,13 @@ export const sourceSnapshotSchema = z.object({
   locator: z.string().max(2000), coverage: z.enum(['full_text', 'excerpt', 'unknown']),
   modelScope: z.array(z.string().max(300)), conditionScope: z.array(z.string().max(1000)),
   interest: z.string().max(1000),
+  // Optional only for loading old backups; absence requires source reinspection.
+  sourceMetadata: z.object({
+    sourceType: z.enum(['official', 'test', 'independent', 'review', 'user']),
+    publisher: z.string().nullable(), title: shortText,
+    origin: z.enum(['direct_input', 'external_response', 'fetched']),
+    fileName: z.string().nullable(), duplicateGroupId: z.string().nullable(),
+  }).optional(),
 });
 export type SourceSnapshot = z.infer<typeof sourceSnapshotSchema>;
 export const sourceSchema = z.object({

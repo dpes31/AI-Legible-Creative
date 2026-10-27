@@ -124,4 +124,58 @@ describe('PoC 1단계 승인 경로', () => {
     expect(p.sources[0].snapshots).toHaveLength(2);
     expect(isVerifiedClaim(p, p.claims[0])).toBe(false);
   });
+  for (const field of ['sourceType', 'publisher', 'title', 'origin', 'fileName', 'duplicateGroupId'] as const) {
+    it(field + ': 본문이 같아도 출처 신뢰도 메타데이터 변경은 승인·분석·재열기에서 보류한다', async () => {
+      const p = verifyClaim(evidenceProject(), 'c', note);
+      const source = p.sources[0];
+      const originalSnapshot = structuredClone(source.snapshots![0]);
+      if (field === 'sourceType') source.sourceType = 'official';
+      if (field === 'publisher') source.publisher = '변경된 발행자';
+      if (field === 'title') source.title = '변경된 자료 이름';
+      if (field === 'origin') source.origin = 'fetched';
+      if (field === 'fileName') source.fileName = 'different-file.txt';
+      if (field === 'duplicateGroupId') source.duplicateGroupId = 'changed-group';
+      expect(source.hash).toBe(fingerprint(source.body));
+      expect(snapshotHash(source.body)).toBe(originalSnapshot.sha256);
+      expect(inspectSource(source, p.claims[0].quote).reasons).toContain('출처 분류·발행자 등 메타데이터가 수집 기록과 다릅니다. 원출처와 재대조해 주세요.');
+      expect(isVerifiedClaim(p, p.claims[0])).toBe(false);
+      expect(() => verifyClaim(p, 'c', note)).toThrow('메타데이터');
+      expect(buildStrategy(p).eligible).toHaveLength(0);
+      expect(hasUsableEvidence(p)).toBe(false);
+      p.questions = [{ id: 'q', text: '허구 질문', provenance: 'hypothesis', sourceIds: ['s'] }];
+      expect(() => saveQuestionAnswer(p, 'q', '확정 답변으로 사용 시도', ['c'])).toThrow('근거');
+      const opened = (await loadProject((await saveProject(p, null)).id))!;
+      expect(opened.claims[0].status).toBe('insufficient');
+      expect(opened.claims[0].evidenceHold?.previousStatus).toBe('supported');
+      expect(opened.sources[0].snapshots![0]).toEqual(originalSnapshot);
+      expect(opened.claims[0].review).toEqual(p.claims[0].review);
+      expect(() => verifyClaim(opened, 'c', note)).toThrow('메타데이터');
+    });
+  }
+  it('발행자 기록 동시 변경도 이전 의미 검토를 재사용하지 못하며 새 수집·검토가 필요하다', async () => {
+    const p = verifyClaim(evidenceProject(), 'c', note);
+    p.sources[0].publisher = '다른 발행자';
+    p.sources[0].snapshots![0].sourceMetadata!.publisher = '다른 발행자';
+    expect(inspectClaim(p, p.claims[0]).state).toBe('needs_semantic_review');
+    expect(isVerifiedClaim(p, p.claims[0])).toBe(false);
+    const held = revalidateEvidence(p);
+    expect(held.claims[0].status).toBe('insufficient');
+    // Explicit source reinspection creates a new snapshot; no automatic approval.
+    held.sources[0] = captureSource(held.sources[0], held.sources[0].snapshots![0]);
+    expect(held.sources[0].snapshots).toHaveLength(2);
+    expect(isVerifiedClaim(held, held.claims[0])).toBe(false);
+    const verified = verifyClaim(held, 'c', note);
+    const opened = (await loadProject((await saveProject(verified, null)).id))!;
+    expect(isVerifiedClaim(opened, opened.claims[0])).toBe(true);
+  });
+  it('출처 메타데이터 없는 이전 백업은 삭제·자동 보정하지 않고 재대조 전까지 보류한다', async () => {
+    const p = verifyClaim(evidenceProject(), 'c', note);
+    delete p.sources[0].snapshots![0].sourceMetadata;
+    expect(() => verifyClaim(p, 'c', note)).toThrow('발행자 수집 기록');
+    const opened = (await loadProject((await saveProject(p, null)).id))!;
+    expect(opened.claims[0].status).toBe('insufficient');
+    expect(opened.sources[0].body).toBe(p.sources[0].body);
+    expect(opened.sources[0].snapshots![0].sourceMetadata).toBeUndefined();
+    expect(buildStrategy(opened).eligible).toHaveLength(0);
+  });
 });
