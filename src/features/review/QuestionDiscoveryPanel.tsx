@@ -43,7 +43,7 @@ export function QuestionDiscoveryPanel({ project, update }: { project: Project; 
       <label className="field">확보 구간·생략 범위<input value={input.locator} onChange={e => set('locator', e.target.value)} /></label>
       <label className="field">발췌 게시일<input type="date" value={input.publishedAt || ''} onChange={e => set('publishedAt', e.target.value || null)} /></label>
       <label className="field">자료의 브랜드 (미확인이면 비움)<input value={input.brand} onChange={e => set('brand', e.target.value)} /></label>
-      <label className="field">상업적 이해관계·표본 한계<input value={input.interest} onChange={e => set('interest', e.target.value)} /></label>
+      <label className="field">이 발췌의 보상·표본 제한<input value={input.interest} onChange={e => set('interest', e.target.value)} /></label>
       <label className="row small"><input type="checkbox" checked={input.independence === 'declared'} onChange={e => set('independence', e.target.checked ? 'declared' : 'unknown')} />다른 사건·재게시와 독립적인지 대조했습니다 (수집자 선언)</label>
       <label className="field">독립성 대조 내용<input value={input.independenceNote} onChange={e => set('independenceNote', e.target.value)} /></label>
       <label className="row small"><input type="checkbox" checked={input.privacyReviewed} onChange={e => set('privacyReviewed', e.target.checked)} />개인정보와 문맥 생략 범위를 검토했습니다</label>

@@ -143,7 +143,7 @@ describe('소비자 전용 발견과 실행 기록', () => {
     p = importQuestionDiscovery(p, raw.runId, JSON.stringify(raw));
     expect(discoveryEvidenceAssessment(p, p.questionCandidates[0]).incidentCount).toBe(1);
   });
-  for (const mutation of ['sourceType', 'publisher', 'rights', 'row', 'snapshot', 'prompt', 'model', 'manifest', 'response', 'candidate'] as const) {
+  for (const mutation of ['sourceType', 'publisher', 'rights', 'row', 'snapshot', 'prompt', 'model', 'manifest', 'response', 'candidate', 'duplicate_row', 'duplicate_source'] as const) {
     it(mutation + ': 수용 후 변경은 분석 사용·저장·재열기에서 보류하고 원본을 남긴다', async () => {
       const p = accepted(); const run = p.questionDiscoveryRuns[0], c = p.questionCandidates[0];
       expect(isAcceptedDiscoveryCandidate(p, c)).toBe(true);
@@ -157,7 +157,14 @@ describe('소비자 전용 발견과 실행 기록', () => {
       if (mutation === 'manifest') run.manifest[0].independence = 'declared';
       if (mutation === 'response') run.attempts[0].raw += ' 변경';
       if (mutation === 'candidate') c.reason = '변경한 해석';
+      if (mutation === 'duplicate_row') p.consumerObservations.push(p.consumerObservations[0]);
+      if (mutation === 'duplicate_source') p.sources.push(p.sources[0]);
       expect(isAcceptedDiscoveryCandidate(p, c)).toBe(false);
+      if (mutation === 'duplicate_row' || mutation === 'duplicate_source') {
+        expect(revalidateDiscovery(p).questionCandidates[0].status).toBe('stale');
+        await expect(saveProject(p, null)).rejects.toThrow('중복');
+        return;
+      }
       const saved = await saveProject(p, null), opened = (await loadProject(saved.id))!;
       expect(opened.questionCandidates[0].status).toBe('stale');
       expect(opened.questionDiscoveryRuns[0].attempts[0].raw).toBe(run.attempts[0].raw);

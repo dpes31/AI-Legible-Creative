@@ -26,6 +26,9 @@ export function discoveryRunReasons(project: Project, run: DiscoveryRun): string
   const reasons: string[] = [];
   if (run.projectId !== project.id) reasons.push('다른 프로젝트의 실행입니다.');
   if (project.questionDiscoveryRuns.filter(r => r.id === run.id).length !== 1) reasons.push('실행 ID가 중복됩니다.');
+  if (run.manifest.some(m => project.consumerObservations.filter(r => r.id === m.rowId && r.projectId === project.id).length !== 1 ||
+    project.sources.filter(s => s.id === m.sourceId && s.projectId === project.id).length !== 1))
+    reasons.push('원자료 행·출처가 누락됐거나 번호가 중복됩니다.');
   if (run.configurationHash !== discoveryConfigurationHash(run)) reasons.push('실행 모델·입력 구성·표본 기록이 바뀌었습니다.');
   if (run.status === 'stale' || run.status === 'cancelled') reasons.push('현재 사용할 수 없는 이전 실행입니다.');
   if (snapshotHash(run.input) !== run.inputHash || snapshotHash(run.prompt) !== run.promptHash)

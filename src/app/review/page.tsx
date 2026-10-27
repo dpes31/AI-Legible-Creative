@@ -114,7 +114,6 @@ export default function ReviewPage() {
       <h3>경쟁 제품과 같은 점·다른 점</h3>{project.comparisons.length ? project.comparisons.map(c => <ComparisonReview key={c.id} project={project} comparison={c} update={update} onError={setError} />) : <p className="small muted">비교할 자료가 없습니다. 자사 특징만으로 우위를 판단하지 않습니다.</p>}
     </details>
     <QuestionDiscoveryPanel key={project.id} project={project} update={update} />
-    {<details className={styles.fold}><summary>소비자·검색 자료 더하기 <span>구조화 파일 {project.consumerDatasets.length}개</span></summary><ConsumerDataForm project={project} update={update} /></details>}
     {<details className={styles.fold}><summary>제품 원문 자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>}
     {hasAnalysis && <details className={styles.fold} open={!!project.manualResearchRequestId}><summary>조사 보완하기 <span>새 자료나 질문이 있을 때</span></summary><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></details>}
     {hasAnalysis && <section className="card" aria-labelledby="next-step-heading"><span className="eyebrow">다음 단계 · 3. 결과 받기</span><h2 id="next-step-heading">작성 요청문을 만드시겠어요?</h2>
