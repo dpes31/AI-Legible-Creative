@@ -25,6 +25,6 @@ export function addEvidenceClaim(project: Project, sourceId: string,
   input: { statement: string; quote: string; subject: string; conditions: string }) {
   if (!project.sources.some(item => item.id === sourceId)) throw new Error('원문 자료를 찾지 못했습니다.');
   const claim = claimSchema.parse({ ...input, id: crypto.randomUUID(), projectId: project.id, sourceId,
-    status: 'unreviewed', reviewedBy: null, target: 'own' });
+    status: 'unreviewed', reviewedBy: null, target: input.subject.includes(project.name) ? 'own' : 'unresolved' });
   return evidenceChanged({ ...project, claims: [...project.claims, claim] });
 }

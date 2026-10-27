@@ -62,6 +62,7 @@ export function inspectClaim(project: Project, claim: Claim) {
   if (!source) return { state: 'hold' as const, reasons: ['연결된 원문 출처가 없습니다.'], snapshotId: undefined };
   const check = inspectSource(source, claim.quote);
   const reasons = [...check.reasons];
+  if (claim.target === 'unresolved') reasons.push('이 주장의 제품 범위를 아직 확정하지 않았습니다.');
   const snapshot = check.snapshot;
   const inQuote = new Set(quantities(claim.quote));
   if (quantities(claim.statement + ' ' + claim.conditions).some(value => !inQuote.has(value)))

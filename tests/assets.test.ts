@@ -1,3 +1,4 @@
+import { reviewSyntheticEvidence } from './helpers/synthetic-evidence';
 import { expect, it } from 'vitest';
 import { importSameModelEvidence, improvementSuggestions, recordPublication, saveQuestionAnswer, verifyPublicationText } from '../src/domain/assets';
 import { assertProjectRelations, newProject } from '../src/domain/schema';
@@ -16,7 +17,10 @@ it('같은 모델 자료만 명시적으로 옮기며 새 작업에서는 주장
   from.claims = [{ id: 'c', projectId: from.id, sourceId: 's', statement: '모델 A 설명', quote: '모델 A.', conditions: '',
     subject: '가상 의자 A', status: 'supported', reviewedBy: 'human' }];
   expect(() => importSameModelEvidence(project('B'), from)).toThrow('같은 브랜드');
-  const target = importSameModelEvidence(project(), from);
+  const reviewed = reviewSyntheticEvidence(from);
+  const target = importSameModelEvidence(project(), reviewed);
+  reviewed.sources[0].hash = 'fnv1a:changed';
+  expect(() => importSameModelEvidence(project(), reviewed)).toThrow('원문');
   expect(target.claims[0].status).toBe('unreviewed');
   expect(target.claims[0].id).not.toBe('c');
   expect(target.sources[0].id).not.toBe('s');

@@ -1,5 +1,6 @@
 import { fingerprint } from './text';
 import { type Channel, type Project } from './schema';
+import { isVerifiedClaim } from './analysis/source-audit';
 
 function publicBody(project: Project, channel: Channel): string {
   return project.documents[channel]?.blocks.filter(block => block.kind !== 'note').map(block => block.text.trim())
@@ -8,7 +9,7 @@ function publicBody(project: Project, channel: Channel): string {
 
 export function saveQuestionAnswer(project: Project, questionId: string, answer: string, claimIds: string[]): Project {
   if (!project.questions.some(q => q.id === questionId) || !answer.trim()) throw new Error('고객 질문과 답변을 확인해 주세요.');
-  if (claimIds.some(id => !project.claims.some(c => c.id === id && c.status === 'supported' && c.target !== 'competitor' &&
+  if (claimIds.some(id => !project.claims.some(c => c.id === id && isVerifiedClaim(project, c) && c.target !== 'competitor' &&
     project.sources.some(s => s.id === c.sourceId && s.publicationAllowed && s.origin !== 'external_response'))))
     throw new Error('확인되지 않은 제품 사실은 답변의 근거로 연결할 수 없습니다.');
   const previous = project.questionAnswers.find(item => item.questionId === questionId);
@@ -59,7 +60,7 @@ export function importSameModelEvidence(target: Project, from: Project): Project
       !target.officialUrl || target.officialUrl !== from.officialUrl) {
     throw new Error('같은 브랜드·제품·모델·시장·공식 링크가 확인된 작업끼리만 자료를 가져올 수 있습니다.');
   }
-  const eligible = from.claims.filter(c => c.status === 'supported' && c.target !== 'competitor' &&
+  const eligible = from.claims.filter(c => isVerifiedClaim(from, c) && c.target !== 'competitor' &&
     from.sources.some(s => s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed && s.origin !== 'external_response'));
   const sources = from.sources.filter(s => eligible.some(c => c.sourceId === s.id));
   if (!sources.length) throw new Error('다시 검토할 수 있는 공개 허용 원문이 없습니다.');

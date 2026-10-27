@@ -1,3 +1,5 @@
+import { addEvidenceClaim, storeEvidenceSource } from '../src/domain/analysis/evidence-intake';
+import { saveQuestionAnswer } from '../src/domain/assets';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { captureSource, inspectClaim, inspectSource, isVerifiedClaim, revalidateEvidence, snapshotHash } from '../src/domain/analysis/source-audit';
@@ -55,6 +57,8 @@ describe('PoC 1단계 승인 경로', () => {
       const stale = { ...p, claims: [{ ...p.claims[0], status: 'supported' as const }] };
       expect(buildStrategy(stale).eligible).toHaveLength(0);
       expect(hasUsableEvidence(stale)).toBe(false);
+      stale.questions = [{ id: 'q', text: '시험 질문', provenance: 'hypothesis', sourceIds: ['s'] }];
+      expect(() => saveQuestionAnswer(stale, 'q', '확정 답변으로 사용 시도', ['c'])).toThrow('근거');
       const saved = await saveProject(stale, null);
       const reopened = (await loadProject(saved.id))!;
       expect(reopened.claims[0].status).toBe('insufficient');
@@ -99,6 +103,17 @@ describe('PoC 1단계 승인 경로', () => {
     const raw = { ...p, answerPlans: [{ id: 'a', questionId: 'q', directAnswer: '잘못된 확정 답변', applicableModel: 'A-1',
       alternatives: [], selectionReason: '', limitations: '', contentGap: '', claimIds: ['c'], comparisonIds: [], channels: [], reviewStatus: 'reviewed' as const }] };
     expect(revalidateEvidence(raw).answerPlans[0].reviewStatus).toBe('proposed');
+  });
+  it('수집 경로는 권한과 이전 스냅샷을 보존하고 다른 제품 주장은 범위 미확정으로 둔다', () => {
+    const p = evidenceProject();
+    const source = p.sources[0];
+    const saved = storeEvidenceSource(p, source, source.snapshots![0]);
+    expect(saved.sources[0].snapshots).toHaveLength(2);
+    expect(saved.sources[0].publicationAllowed).toBe(source.publicationAllowed);
+    expect(saved.sources[0].externalAiAllowed).toBe(source.externalAiAllowed);
+    const proposed = addEvidenceClaim(saved, source.id, { statement: '다른 제품 주장', quote: source.body, subject: '다른 제품', conditions: '' });
+    expect(proposed.claims.at(-1)?.target).toBe('unresolved');
+    expect(proposed.claims.at(-1)?.evidenceHold?.reasons).toContain('이 주장의 제품 범위를 아직 확정하지 않았습니다.');
   });
   it('새 스냅샷이 이전 기록을 보존하고 이전 승인을 무효화한다', () => {
     const p = verifyClaim(evidenceProject(), 'c', note);
