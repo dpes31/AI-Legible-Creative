@@ -27,7 +27,7 @@ describe('작성 공통 자료와 인사이트 검수', () => {
     const p = approveInsight(reviseInsight(specimen(), '실측 크기를 먼저 설명해 주세요. 더 작다고 단정하지 마세요.'));
     const brief = buildContentBrief(p, 'request-1', p.selectedChannels);
     expect(brief.questions[0].painPoint).toBe('큰 의자');
-    expect(brief.allowedClaims[0]).toMatchObject({ conditions: '세웠을 때', quote: '세웠을 때 가로 폭 68cm.', sourceUrl: 'https://example.org/source' });
+    expect(brief.allowedClaims[0]).toMatchObject({ conditions: '세웠을 때', quote: '세웠을 때 허구 미니 의자 A-1 가로 폭 68cm.', sourceUrl: 'https://example.org/source' });
     expect(brief.comparisons[0].state).toBe('비교 미확인');
     expect(brief.entity).toMatchObject({ youtubePrefix: '[COWAY BEREX]', officialUrl: 'https://example.org/item' });
     expect(prepareContent(p).prompt).toContain('실측 크기를 먼저 설명해 주세요.');

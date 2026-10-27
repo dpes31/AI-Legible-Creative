@@ -71,6 +71,9 @@ export function inspectClaim(project: Project, claim: Claim) {
     normalize(source.body).includes(normalize(model)));
   if (!claim.subject.trim() || !scoped) reasons.push('원문에서 적용 모델·제품 범위를 확인하지 못했습니다.');
   const modelTokens: string[] = claim.subject.match(/[A-Z0-9]+(?:-[A-Z0-9]+)+/gi) || [];
+  const quoteModels: string[] = claim.quote.match(/[A-Z0-9]+(?:-[A-Z0-9]+)+/gi) || [];
+  if (modelTokens.some(model => !quoteModels.includes(model)))
+    reasons.push('해당 인용 구간에서 적용 모델 코드를 확인하지 못했습니다.');
   if (project.model && claim.target !== 'competitor' && !(modelTokens.includes(project.model) ||
     (!/[A-Z0-9]+(?:-[A-Z0-9]+)+/i.test(project.model) && normalize(claim.subject).split(' ').includes(project.model))))
     reasons.push('현재 모델과 주장의 적용 모델이 다릅니다.');

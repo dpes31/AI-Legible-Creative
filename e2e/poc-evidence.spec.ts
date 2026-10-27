@@ -91,7 +91,7 @@ test('실제 보도자료 파생 변조: 숫자·hash·실패·모델·조건과
   await page.locator('#evidence article').getByText('이 주장의 의미와 모델 조건 검토').click();
   await page.locator('#evidence article').getByLabel('의미 검토 이유와 한계').fill(data.release.note);
   await page.locator('#evidence article').getByRole('button', { name: '원문과 의미를 직접 대조했어요' }).click();
-  await expect(page.getByRole('alert')).toContainText('수치');
+  await expect(page.locator('main').getByRole('alert')).toContainText('수치');
   const saved = await backup(page);
   for (const mutation of ['hash', 'sha256', 'failed', 'model', 'conditions', 'missingSnapshot']) {
     const corrupt = structuredClone(saved);
@@ -113,7 +113,7 @@ test('실제 보도자료 파생 변조: 숫자·hash·실패·모델·조건과
     await restored.locator('#evidence article').getByText('이 주장의 의미와 모델 조건 검토').click();
     await restored.locator('#evidence article').getByLabel('의미 검토 이유와 한계').fill(data.release.note);
     await restored.locator('#evidence article').getByRole('button', { name: '원문과 의미를 직접 대조했어요' }).click();
-    await expect(restored.getByRole('alert')).toBeVisible();
+    await expect(restored.locator('main').getByRole('alert')).toBeVisible();
     await expect(restored.locator('#evidence article')).not.toContainText('자동 대조 + 사람 의미 검토 기록');
     await restored.reload(); await restored.locator('#evidence > summary').click();
     await expect(restored.locator('#evidence article')).toContainText('보류');

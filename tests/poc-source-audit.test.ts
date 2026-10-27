@@ -82,6 +82,9 @@ describe('PoC 1단계 승인 경로', () => {
       const p = evidenceProject(); p.claims[0].statement = statement;
       expect(() => verifyClaim(p, 'c', note)).toThrow();
     }
+    const noLocalModel = evidenceProject();
+    noLocalModel.claims[0].quote = '기존 무빙형 대비 부피를 9% 줄였다.';
+    expect(() => verifyClaim(noLocalModel, 'c', note)).toThrow('인용 구간');
     const p = verifyClaim(evidenceProject(), 'c', note);
     p.sources[0].snapshots![0].locator = '바뀐 범위';
     expect(isVerifiedClaim(p, p.claims[0])).toBe(false);

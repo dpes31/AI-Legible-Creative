@@ -12,6 +12,7 @@ export function reviewSyntheticEvidence(project: Project, claimIds = project.cla
     const source = p.sources.find(s => s.id === claim.sourceId)!;
     if (source.url?.includes('coway.com') || source.url?.includes('puliodays.com')) throw new Error('Real sources must not use synthetic provenance.');
     claim.conditions ||= '허구 시험 조건';
+    if ((claim.subject.match(/[A-Z0-9]+(?:-[A-Z0-9]+)+/gi) || []).some(model => !claim.quote.includes(model))) claim.quote = claim.subject + ' ' + claim.quote;
     if (!claim.quote.includes(claim.conditions)) claim.quote = claim.conditions + ' ' + claim.quote;
     if (!source.body.includes(claim.subject)) source.body = claim.subject + '\n' + source.body;
     if (!source.body.includes(claim.quote)) source.body += '\n' + claim.quote;
