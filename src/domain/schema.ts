@@ -17,6 +17,16 @@ export const categorySchema = z.enum(['berex', 'environment', 'wearable', 'other
 export type ProductCategory = z.infer<typeof categorySchema>;
 export type Objective = z.infer<typeof objectiveSchema>;
 export const objectiveNames: Record<Objective, string> = { sales: '구매·문의 늘리기', feature: '제품 특징 알리기', trust: '브랜드 신뢰 높이기' };
+export const sourceSnapshotSchema = z.object({
+  id, text: z.string().max(300000), sha256: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  url: webUrl.nullable(), capturedAt: z.string().datetime(), publishedAt: z.string().nullable(),
+  retrieval: z.enum(['fetched', 'user_provided', 'failed', 'partial']),
+  method: z.enum(['manual_excerpt', 'file_text', 'http_text']),
+  locator: z.string().max(2000), coverage: z.enum(['full_text', 'excerpt', 'unknown']),
+  modelScope: z.array(z.string().max(300)), conditionScope: z.array(z.string().max(1000)),
+  interest: z.string().max(1000),
+});
+export type SourceSnapshot = z.infer<typeof sourceSnapshotSchema>;
 export const sourceSchema = z.object({
   id, projectId: id, title: shortText, url: webUrl.nullable(),
   excerpt: z.string().max(50000), body: z.string().max(300000),
@@ -29,6 +39,7 @@ export const sourceSchema = z.object({
   publisher: z.string().nullable().optional(),
   fileName: z.string().optional(),
   duplicateGroupId: z.string().optional(),
+  snapshots: z.array(sourceSnapshotSchema).optional(), activeSnapshotId: id.optional(),
 });
 export type Source = z.infer<typeof sourceSchema>;
 export const claimSchema = z.object({
@@ -38,7 +49,10 @@ export const claimSchema = z.object({
   reviewedBy: z.enum(['human', 'model', 'deterministic']).nullable(),
   subject: z.string().max(300),
   target: z.enum(['own', 'competitor', 'unresolved']).optional(),
-  review: z.object({ sourceHash: id, quote: z.string(), at: z.string().datetime(), method: z.enum(['human', 'model']) }).optional(),
+  review: z.object({ sourceHash: id, quote: z.string(), at: z.string().datetime(), method: z.enum(['human', 'model']),
+    snapshotId: id.optional(), snapshotHash: z.string().optional(), claimHash: z.string().optional(), note: z.string().max(3000).optional() }).optional(),
+  evidenceHold: z.object({ reasons: z.array(z.string()), checkedAt: z.string().datetime(),
+    previousStatus: z.enum(['unreviewed', 'supported', 'contradicted', 'insufficient']) }).optional(),
 });
 export type Claim = z.infer<typeof claimSchema>;
 export const questionSchema = z.object({

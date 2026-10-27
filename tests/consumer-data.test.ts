@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { parseDelimitedText, autoMapColumns, importConsumerDataset, externalDatasetContext, readConsumerDataFile } from '../src/domain/consumer-data';
@@ -42,14 +43,19 @@ describe('소비자 자료 가져오기와 근거 범위', () => {
   });
 
   it('압축 해제 크기가 제한을 넘는 XLSX를 읽기 전에 거절한다', async () => {
-    const archive = new JSZip();
-    archive.file('xl/workbook.xml', '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="검색어" sheetId="1" r:id="rId1"/></sheets></workbook>');
-    archive.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>');
-    archive.file('xl/worksheets/sheet1.xml', '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>검색어</t></is></c></row></sheetData></worksheet>');
-    archive.file('xl/unused-large-part.xml', 'x'.repeat(51 * 1024 * 1024));
-    const bytes = await archive.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+    // Pre-compressed, synthetic 51 MiB unused ZIP entry. Generate once, not in each timed test.
+    const bytes = Buffer.from(readFileSync(new URL('./fixtures/consumer-overlimit.xlsx.b64', import.meta.url), 'utf8').trim(), 'base64');
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     await expect(readConsumerDataFile(new File([arrayBuffer], 'large.xlsx'))).rejects.toThrow(/압축 해제 후 크기/);
+  });
+
+  it('크기 예비 검사 후에도 허용 크기 ZIP의 CRC 오류를 거절한다', async () => {
+    const zip = new JSZip(); zip.file('test.txt', 'small crc fixture');
+    const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'STORE' });
+    const central = bytes.findIndex((_, i) => bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 1 && bytes[i + 3] === 2);
+    bytes[central + 16] ^= 1;
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    await expect(readConsumerDataFile(new File([arrayBuffer], 'corrupt.xlsx'))).rejects.toThrow(/CRC32/);
   });
 
   it('0과 결측값, 원본 행, 기간·단위·상대지표를 분리해 보존한다', () => {

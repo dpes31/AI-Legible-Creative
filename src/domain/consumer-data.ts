@@ -95,12 +95,15 @@ function textNodes(xml: string): string {
 }
 
 async function parseXlsx(buffer: ArrayBuffer) {
-  const zip = await JSZip.loadAsync(buffer, { checkCRC32: true, createFolders: false });
-  const expandedBytes = Object.values(zip.files).reduce((total, entry) => total +
+  // Inspect the ZIP directory before CRC validation: checkCRC32 inflates every
+  // entry, including oversized unused parts. Keep full CRC validation below.
+  const directory = await JSZip.loadAsync(buffer, { checkCRC32: false, createFolders: false });
+  const expandedBytes = Object.values(directory.files).reduce((total, entry) => total +
     ((entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize || 0), 0);
   if (expandedBytes > CONSUMER_DATA_LIMITS.expandedFileBytes) {
     throw new Error(`Excel 압축 해제 후 크기가 ${CONSUMER_DATA_LIMITS.expandedFileBytes / 1024 / 1024}MB를 넘습니다. 파일을 나누어 주세요.`);
   }
+  const zip = await JSZip.loadAsync(buffer, { checkCRC32: true, createFolders: false });
   const names = Object.keys(zip.files);
   if (names.some(name => /(^|\/)vbaProject\.bin$/i.test(name))) throw new Error('매크로가 포함된 Excel 파일은 가져오지 않습니다. CSV로 내보내 주세요.');
   if (names.some(name => name.startsWith('xl/externalLinks/'))) throw new Error('외부 파일 연결이 포함된 Excel입니다. CSV로 내보내 주세요.');

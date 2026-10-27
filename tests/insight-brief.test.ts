@@ -1,3 +1,4 @@
+import { reviewSyntheticEvidence } from './helpers/synthetic-evidence';
 import { describe, expect, it } from 'vitest';
 import { newProject } from '../src/domain/schema';
 import { approveInsight, hasUsableEvidence, insightCurrent, reviseInsight } from '../src/domain/insight';
@@ -18,7 +19,7 @@ function specimen() {
     collectedAt: p.createdAt, externalAiAllowed: true, publicationAllowed: true, hash: 'h' }];
   p.claims = [{ id: 'c', projectId: p.id, statement: '가로 폭 68cm', sourceId: 's', quote: '가로 폭 68cm.',
     conditions: '세웠을 때', subject: '허구 미니 의자 A-1', status: 'supported', reviewedBy: 'human' }];
-  return p;
+  return reviewSyntheticEvidence(p);
 }
 
 describe('작성 공통 자료와 인사이트 검수', () => {
@@ -26,7 +27,7 @@ describe('작성 공통 자료와 인사이트 검수', () => {
     const p = approveInsight(reviseInsight(specimen(), '실측 크기를 먼저 설명해 주세요. 더 작다고 단정하지 마세요.'));
     const brief = buildContentBrief(p, 'request-1', p.selectedChannels);
     expect(brief.questions[0].painPoint).toBe('큰 의자');
-    expect(brief.allowedClaims[0]).toMatchObject({ conditions: '세웠을 때', quote: '가로 폭 68cm.', sourceUrl: 'https://example.org/source' });
+    expect(brief.allowedClaims[0]).toMatchObject({ conditions: '세웠을 때', quote: '세웠을 때 가로 폭 68cm.', sourceUrl: 'https://example.org/source' });
     expect(brief.comparisons[0].state).toBe('비교 미확인');
     expect(brief.entity).toMatchObject({ youtubePrefix: '[COWAY BEREX]', officialUrl: 'https://example.org/item' });
     expect(prepareContent(p).prompt).toContain('실측 크기를 먼저 설명해 주세요.');

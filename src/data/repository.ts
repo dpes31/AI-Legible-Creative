@@ -1,6 +1,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { assertProjectRelations, projectSchema, type Project } from '@/domain/schema';
 import { convertLegacy } from './legacy';
+import { revalidateEvidence } from '@/domain/analysis/source-audit';
 import { brandProfileSchema, catalogEntitySchema, type BrandProfile, type CatalogEntity } from '@/domain/portfolio';
 
 const DB_NAME = 'alc-projects-v2';
@@ -101,17 +102,17 @@ export class RevisionConflict extends Error {
 
 export async function listProjects(): Promise<Project[]> {
   const db = await database();
-  return (await db.getAll('projects')).map(value => projectSchema.parse(value))
+  return (await db.getAll('projects')).map(value => revalidateEvidence(projectSchema.parse(value)))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function loadProject(id: string): Promise<Project | null> {
   const value = await (await database()).get('projects', id);
-  return value ? projectSchema.parse(value) : null;
+  return value ? revalidateEvidence(projectSchema.parse(value)) : null;
 }
 
 export async function saveProject(project: Project, expectedRevision: number | null): Promise<Project> {
-  const valid = projectSchema.parse(project);
+  const valid = revalidateEvidence(projectSchema.parse(project));
   assertProjectRelations(valid);
   const db = await database();
   const tx = db.transaction(['projects', 'metadata'], 'readwrite');

@@ -1,5 +1,6 @@
 import { channelNames, objectiveNames, type Channel, type Comparison, type Project } from '../schema';
 import { assessRecommendation } from './recommendations';
+import { isVerifiedClaim } from './source-audit';
 
 export const researchLimits = { batchCompetitors: 3, batchQuestions: 12, batchSources: 20, maxCompetitors: 20, maxQuestions: 100, maxSources: 200 } as const;
 
@@ -16,7 +17,7 @@ export function comparisonAssessment(project: Project, comparison: Comparison) {
   const both = [...comparison.ownClaimIds, ...comparison.otherClaimIds];
   const hasEvidence = comparison.ownClaimIds.length > 0 && comparison.otherClaimIds.length > 0 && both.every(id => {
     const claim = project.claims.find(c => c.id === id);
-    return claim?.status === 'supported' && project.sources.some(s => s.id === claim.sourceId &&
+    return !!claim && isVerifiedClaim(project, claim) && project.sources.some(s => s.id === claim.sourceId &&
       s.origin !== 'external_response' && s.publicationAllowed && claim.quote && s.body.replace(/\s+/g, ' ').includes(claim.quote.replace(/\s+/g, ' ')));
   });
   const reviewed = hasEvidence && comparison.comparable && comparison.review?.evidenceRevision === project.evidenceRevision;
@@ -26,7 +27,7 @@ export function comparisonAssessment(project: Project, comparison: Comparison) {
 }
 
 export function buildStrategy(project: Project) {
-  const eligible = project.claims.filter(c => c.status === 'supported' && c.target !== 'competitor' && c.target !== 'unresolved' &&
+  const eligible = project.claims.filter(c => isVerifiedClaim(project, c) && c.target !== 'competitor' && c.target !== 'unresolved' &&
     project.sources.some(s => s.id === c.sourceId && s.publicationAllowed && s.origin !== 'external_response'))
     .sort((a, b) => a.statement.localeCompare(b.statement, 'ko'));
   const candidates = project.recommendations.map(candidate => ({ candidate, ...assessRecommendation(project, candidate) }))
@@ -35,7 +36,8 @@ export function buildStrategy(project: Project) {
   const linkedQuestions = project.questions.filter(question => question.observationIds?.length &&
     question.observationIds.every(id => acceptedObservations.some(row => row.id === id)));
   const reviewedAnswer = project.answerPlans.find(plan => plan.reviewStatus === 'reviewed' &&
-    linkedQuestions.some(question => question.id === plan.questionId) && plan.directAnswer.trim());
+    linkedQuestions.some(question => question.id === plan.questionId) && plan.directAnswer.trim() &&
+    plan.claimIds.length > 0 && plan.claimIds.every(id => project.claims.some(c => c.id === id && isVerifiedClaim(project, c))));
   const gaps = [...project.missingEvidence];
   if (!eligible.length) gaps.push('공개 문구에 쓸 자사 사실을 원문과 대조해 주세요.');
   if (!project.comparisons.some(c => comparisonAssessment(project, c).reviewed)) gaps.push('현재 자료로는 경쟁 제품보다 나은 점을 확인하지 못했습니다.');

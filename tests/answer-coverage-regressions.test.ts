@@ -1,7 +1,8 @@
+import { reviewSyntheticEvidence } from './helpers/synthetic-evidence';
 import { describe, expect, it } from 'vitest';
 import { newProject } from '../src/domain/schema';
 import { approveInsight, reviseInsight } from '../src/domain/insight';
-import { attachOriginalText, importContent, importResearch, prepareContent, prepareResearch, reviewDocument, verifyClaim } from '../src/domain/workflow';
+import { attachOriginalText, importContent, importResearch, prepareContent, prepareResearch, reviewDocument } from '../src/domain/workflow';
 
 function evidence() {
   const project = prepareResearch(newProject({ name: '가상 이중 체어', kind: 'product', description: '',
@@ -24,7 +25,7 @@ function evidence() {
     ] });
   const imported = importResearch(project, response);
   const connected = attachOriginalText(imported, imported.sources[0].id, imported.sources[0].excerpt, true);
-  return approveInsight(verifyClaim(connected, connected.claims[0].id));
+  return approveInsight(reviewSyntheticEvidence(connected, [connected.claims[0].id]));
 }
 
 function write(project: ReturnType<typeof evidence>, extra: string, feedback = '') {

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { RevisionConflict, preserveConflictDraft, importBackup, importLegacyBackup, listProjects, loadProject, migrateLegacy, saveProject } from '@/data/repository';
 import { type Project } from '@/domain/schema';
+import { revalidateEvidence } from '@/domain/analysis/source-audit';
 
 type Workspace = {
   project: Project | null; projects: Project[]; loading: boolean;
@@ -65,6 +66,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const update = (next: Project) => {
     const previous = projectRef.current;
     if (!previous || previous.id !== next.id || blocked.current) return;
+    next = revalidateEvidence(next);
     projectRef.current = next; setProject(next); setSaveState('saving');
     queue.current = queue.current.then(async () => {
       if (blocked.current) return;

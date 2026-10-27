@@ -9,6 +9,7 @@ import { AnalysisSummary } from '@/features/review/AnalysisSummary';
 import { ComparisonReview } from '@/features/review/ComparisonReview';
 import { SourceForm } from '@/features/review/SourceForm';
 import { ConsumerDataForm } from '@/features/review/ConsumerDataForm';
+import { inspectClaim, revalidateEvidence } from '@/domain/analysis/source-audit';
 import { questionEvidenceLabel } from '@/domain/consumer-data';
 import { ManualExchange } from '@/features/manual/ManualExchange';
 import { approveInsight, hasUsableEvidence, insightCurrent, reviseInsight } from '@/domain/insight';
@@ -20,6 +21,7 @@ export default function ReviewPage() {
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [insightError, setInsightError] = useState('');
   const [advancing, setAdvancing] = useState(false);
+  const [semanticNotes, setSemanticNotes] = useState<Record<string, string>>({});
   const [originals, setOriginals] = useState<Record<string, string>>({});
   const [publication, setPublication] = useState<Record<string, boolean>>({});
   if (loading) return <p role="status">작업을 불러오는 중입니다…</p>;
@@ -48,8 +50,8 @@ export default function ReviewPage() {
     } finally { setAdvancing(false); }
   };
   const confirmClaim = (id: string) => {
-    try { update(verifyClaim(project, id)); setError(''); setNotice('원문과 주장을 직접 대조한 기록을 남겼습니다.'); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '원문을 확인할 수 없습니다.'); }
+    try { update(verifyClaim(project, id, semanticNotes[id] || '')); setError(''); setNotice('원문과 주장을 직접 대조한 기록을 남겼습니다.'); }
+    catch (cause) { update(revalidateEvidence(project)); setError(cause instanceof Error ? cause.message : '원문을 확인할 수 없습니다.'); }
   };
   return <>
     <section className="hero"><div className="eyebrow">2. 분석 확인</div><h1>브랜드 분석: {project.name}</h1>
@@ -89,14 +91,18 @@ export default function ReviewPage() {
       </section>)}
       {!project.claims.length && <p className="muted">조사 응답을 가져오면 문장별 출처와 조건을 함께 볼 수 있습니다.</p>}
       {project.claims.map(claim => { const source = project.sources.find(s => s.id === claim.sourceId);
-        const label = claim.status === 'supported' ? '직접 대조함' : claim.status === 'contradicted' ? '상충하는 근거' : claim.status === 'insufficient' ? '근거 부족' : '원문 확인 필요';
+        const check = inspectClaim(project, claim);
+        const label = claim.status === 'supported' && check.state === 'verified' ? '자동 대조 + 사람 의미 검토 기록' : check.state === 'hold' ? '검증 보류' : claim.status === 'contradicted' ? '상충하는 근거' : claim.status === 'insufficient' ? '근거 부족' : '원문 확인 필요';
         return <article className={styles.claim} key={claim.id}><h3>{claim.statement}</h3><span className={claim.status === 'supported' ? 'badge' : 'badge warn'}>{label}</span>
           <p className="small muted">대상: {claim.subject || '확인 필요'} · {source?.title || '출처 없음'}{source?.sourceType === 'official' ? ' · 공식 자료 기재' : source?.sourceType === 'review' ? ' · 개인 경험' : ''}</p>
+          {check.reasons.map(reason => <p className="small" key={reason}>보류: {reason}</p>)}
+          {claim.evidenceHold?.reasons.filter(reason => !check.reasons.includes(reason)).map(reason => <p className="small" key={reason}>보류 기록: {reason}</p>)}
+          {claim.review?.note && <p className="small">의미 검토 기록: {claim.review.note}</p>}
           {claim.conditions && <p className="small">적용 조건: {claim.conditions}</p>}
           {claim.quote && <blockquote>{claim.quote}</blockquote>}
           {source?.url && <a href={source.url} target="_blank" rel="noreferrer" className="source-link">원문 링크 열기 ↗</a>}
           {source && source.origin !== 'external_response' && <details><summary>저장한 원문 확인</summary><pre className="output">{source.body}</pre></details>}
-          {claim.status !== 'supported' && source && source.origin !== 'external_response' && <details><summary className="small">이 주장의 의미와 모델 조건 검토</summary><button type="button" className="button secondary" onClick={() => confirmClaim(claim.id)}>원문과 의미를 직접 대조했어요</button></details>}
+          {claim.status !== 'supported' && source && source.origin !== 'external_response' && <details><summary className="small">이 주장의 의미와 모델 조건 검토</summary><p className="small">자동 검사는 수집 증적·저장 무결성·명시 사실만 대조합니다. 주장 의미와 과장 여부는 따로 확인해 주세요.</p><label className="field">의미 검토 이유와 한계<textarea value={semanticNotes[claim.id] || ''} onChange={e => setSemanticNotes(old => ({ ...old, [claim.id]: e.target.value }))} /></label><button type="button" className="button secondary" onClick={() => confirmClaim(claim.id)}>원문과 의미를 직접 대조했어요</button></details>}
           <div className="row small"><button className="button text" type="button" onClick={() => { update(rejectClaim(project, claim.id, 'insufficient')); setNotice('이 주장은 근거 부족으로 보류합니다.'); }}>근거가 부족해요</button>
             <button className="button text" type="button" onClick={() => { update(rejectClaim(project, claim.id, 'contradicted')); setNotice('상충하는 주장으로 기록했습니다. 작성에 사용하지 않습니다.'); }}>원문과 맞지 않아요</button></div>
         </article>;
@@ -107,7 +113,7 @@ export default function ReviewPage() {
       <h3>경쟁 제품과 같은 점·다른 점</h3>{project.comparisons.length ? project.comparisons.map(c => <ComparisonReview key={c.id} project={project} comparison={c} update={update} onError={setError} />) : <p className="small muted">비교할 자료가 없습니다. 자사 특징만으로 우위를 판단하지 않습니다.</p>}
     </details>
     {hasAnalysis && <details className={styles.fold}><summary>소비자·검색 자료 더하기 <span>구조화 파일 {project.consumerDatasets.length}개</span></summary><ConsumerDataForm project={project} update={update} /></details>}
-    {hasAnalysis && <details className={styles.fold}><summary>제품 원문 자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>}
+    {<details className={styles.fold}><summary>제품 원문 자료 더하기 <span>저장한 자료 {project.sources.length}개 · TXT, MD, PDF</span></summary><SourceForm key={project.id} project={project} update={update} setError={setError} setNotice={setNotice} /></details>}
     {hasAnalysis && <details className={styles.fold} open={!!project.manualResearchRequestId}><summary>조사 보완하기 <span>새 자료나 질문이 있을 때</span></summary><ManualExchange project={project} stage="research" update={update} onError={setError} onNotice={setNotice} /></details>}
     {hasAnalysis && <section className="card" aria-labelledby="next-step-heading"><span className="eyebrow">다음 단계 · 3. 결과 받기</span><h2 id="next-step-heading">작성 요청문을 만드시겠어요?</h2>
       <p className="small muted">{usableEvidence ? `확인된 사실을 담아 작성합니다. 추가로 확인할 제품 사실 후보 ${draftCandidates}개는 검토용으로 구분합니다.` :

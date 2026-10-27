@@ -10,6 +10,7 @@ import { channelCompleteness, validateDocument } from './validation/document';
 import { buildContentBrief } from './content-brief';
 import { insightCurrent } from './insight';
 import { externalDatasetContext } from './consumer-data';
+import { claimFingerprint, inspectClaim, isVerifiedClaim, sourceSnapshotFingerprint } from './analysis/source-audit';
 export { fingerprint } from './text';
 export { validateDocument } from './validation/document';
 
@@ -290,7 +291,7 @@ export function importResearch(project: Project, response: string, confirmSameEn
   };
 }
 
-export function verifyClaim(project: Project, claimId: string): Project {
+export function verifyClaim(project: Project, claimId: string, semanticNote = ''): Project {
   const claim = project.claims.find(c => c.id === claimId);
   const source = project.sources.find(s => s.id === claim?.sourceId);
   if (claim && claim.target !== 'competitor' && project.model && !claim.subject.includes(project.model)) {
@@ -305,7 +306,14 @@ export function verifyClaim(project: Project, claimId: string): Project {
   if (claim.target !== 'competitor' && !normalize(claim.subject).includes(normalize(project.name))) {
     throw new ImportError('현재 대상과 다른 이름의 주장입니다. 조사 응답에서 정확한 대상명을 확인해 주세요.');
   }
-  const claims = project.claims.map(c => c.id === claimId ? { ...c, status: 'supported' as const, reviewedBy: 'human' as const, review: { sourceHash: source.hash, quote: c.quote, at: new Date().toISOString(), method: 'human' as const } } : c);
+  const check = inspectClaim(project, claim);
+  if (check.state === 'hold') throw new ImportError(check.reasons.join(' '));
+  if (semanticNote.trim().length < 10) throw new ImportError('원문이 이 주장을 지지하는 이유와 해석의 한계를 10자 이상 남겨 주세요. 자동 검사는 의미를 승인하지 않습니다.');
+  const claims = project.claims.map(c => c.id === claimId ? { ...c, status: 'supported' as const, evidenceHold: undefined,
+    reviewedBy: 'human' as const, review: { sourceHash: source.hash, quote: c.quote,
+      at: new Date().toISOString(), method: 'human' as const, snapshotId: check.snapshotId,
+      snapshotHash: sourceSnapshotFingerprint(source.snapshots?.find(s => s.id === check.snapshotId)),
+      claimHash: claimFingerprint(claim), note: semanticNote.trim() } } : c);
   return { ...project, claims, evidenceRevision: project.evidenceRevision + 1,
     manualResearchRequestId: null, manualContentRequestId: null,
     documents: Object.fromEntries(Object.entries(project.documents).map(([key, doc]) => [key, doc && { ...doc, status: 'stale' }])) as Project['documents'] };
@@ -322,9 +330,10 @@ export function attachOriginalText(project: Project, sourceId: string, body: str
   )).map(s => s.id));
   const related = project.claims.filter(c => c.sourceId && linkedIds.has(c.sourceId));
   const unmatched = related.filter(c => !c.quote || !normalize(body).includes(normalize(c.quote)));
+  const collectedAt = new Date().toISOString();
   return { ...project,
     sources: project.sources.map(s => linkedIds.has(s.id) ? {
-      ...s, body, origin: 'direct_input' as const,
+      ...s, body, origin: 'direct_input' as const, collectedAt, retrieval: 'partial' as const,
       hash: fingerprint(body), publicationAllowed,
     } : s),
     claims: project.claims.map(c => c.sourceId && linkedIds.has(c.sourceId) ? { ...c,
@@ -519,7 +528,7 @@ export function confirmComparison(project: Project, comparisonId: string, input:
   if (!comparison || !comparison.ownClaimIds.length || !comparison.otherClaimIds.length ||
       [...comparison.ownClaimIds, ...comparison.otherClaimIds].some(id => {
         const claim = project.claims.find(c => c.id === id);
-        return !claim || claim.status !== 'supported' || !project.sources.some(s => s.id === claim.sourceId && s.origin !== 'external_response' && s.publicationAllowed);
+        return !claim || !isVerifiedClaim(project, claim) || !project.sources.some(s => s.id === claim.sourceId && s.origin !== 'external_response' && s.publicationAllowed);
       })) throw new ImportError('자사와 경쟁 제품 양쪽의 원문·주장을 먼저 확인해 주세요.');
   if (!input.conditions.trim() || !input.reason.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(input.asOf) || Number.isNaN(Date.parse(input.asOf))) throw new ImportError('비교 조건·기준 날짜·판단 이유를 적어 주세요.');
   return { ...project,

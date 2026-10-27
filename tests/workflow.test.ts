@@ -1,3 +1,4 @@
+import { reviewSyntheticEvidence } from './helpers/synthetic-evidence';
 import { describe, expect, it } from 'vitest';
 import { convertLegacy } from '../src/data/legacy';
 import { attachOriginalText, editDocument, importContent, importResearch, prepareContent, prepareResearch, reviewDocument, validateDocument, verifyClaim } from '../src/domain/workflow';
@@ -69,7 +70,7 @@ describe('사실과 프로젝트의 무결성', () => {
     const staleContentId = prepareContent(approveInsight(result, true)).project.manualContentRequestId;
     expect(attachOriginalText({ ...result, manualContentRequestId: staleContentId }, result.sources[0].id,
       '제품의 색상은 파란색입니다.', true).manualContentRequestId).toBeNull();
-    const checked = verifyClaim(attached, attached.claims[0].id);
+    const checked = reviewSyntheticEvidence(attached, [attached.claims[0].id]);
     expect(checked.claims[0].status).toBe('supported');
     expect(checked.evidenceRevision).toBe(3);
   });
@@ -97,7 +98,7 @@ describe('사실과 프로젝트의 무결성', () => {
         retrieval: 'user_provided' as const, origin: 'direct_input' as const, publishedAt: null,
         collectedAt: initial.createdAt, externalAiAllowed: true, publicationAllowed: true, hash: 'body' }],
       claims: [{ id: claimId, projectId: initial.id, statement: '뚜껑을 돌려 닫습니다.', sourceId,
-        quote: '뚜껑을 돌려 닫습니다.', conditions: '', subject: initial.name,
+        quote: '뚜껑을 돌려 닫습니다.', conditions: '뚜껑', subject: initial.name,
         status: 'supported' as const, reviewedBy: 'human' as const }],
       documents: { ad_copy: { id: crypto.randomUUID(), channel: 'ad_copy' as const, revision: 1,
         evidenceRevision: 1, reviewedBlocks: {}, validationHash: null, status: 'needs_review' as const,
@@ -105,8 +106,8 @@ describe('사실과 프로젝트의 무결성', () => {
         blocks: [{ id: 'heading', kind: 'heading' as const, text: '어떤 컵을 찾으세요?', claimRefs: [] },
           { id: 'fact', kind: 'paragraph' as const, text: '뚜껑을 돌려 닫습니다.', claimRefs: [claimId] }] } },
     };
-    const approved = approveInsight(withEvidence);
-    approved.documents.ad_copy = { ...approved.documents.ad_copy!, insightRevision: approved.insight.revision };
+    const approved = approveInsight(reviewSyntheticEvidence(withEvidence));
+    approved.documents.ad_copy = { ...approved.documents.ad_copy!, insightRevision: approved.insight.revision, evidenceRevision: approved.evidenceRevision };
     expect(() => reviewDocument(approved, 'ad_copy')).toThrow('광고 3안');
     const complete = editDocument(approved, 'ad_copy', [
       { id: 'heading', kind: 'heading', text: '닫는 방법부터', claimRefs: [] },
@@ -141,6 +142,8 @@ describe('사실과 프로젝트의 무결성', () => {
       collectedAt: p.createdAt, externalAiAllowed: false, publicationAllowed: true, hash: 'h' }];
     p.claims = [{ id: 'private-claim', projectId: p.id, statement: '내부에서만 확인한 특징', sourceId: 'private-source',
       quote: '내부에서만 확인한 특징', conditions: '', subject: p.name, status: 'supported', reviewedBy: 'human' }];
+    const reviewed = reviewSyntheticEvidence(p);
+    p.sources = reviewed.sources; p.claims = reviewed.claims; p.evidenceRevision = reviewed.evidenceRevision;
     expect(prepareContent(approveInsight(p, true)).prompt).not.toContain('내부에서만 확인한 특징');
     p.sources[0].externalAiAllowed = true;
     expect(prepareContent(approveInsight(p)).prompt).toContain('내부에서만 확인한 특징');

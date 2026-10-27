@@ -3,13 +3,16 @@ import { useState } from 'react';
 import { type Project, type Source } from '@/domain/schema';
 import { fingerprint } from '@/domain/workflow';
 import { readEvidenceFile, FILE_LIMITS } from './readFile';
-function markStale(project: Project) {
-  return Object.fromEntries(Object.entries(project.documents).map(([key, doc]) => [key, doc && { ...doc, status: 'stale' }])) as Project['documents'];
-}
+import { storeEvidenceSource } from '@/domain/analysis/evidence-intake';
+import { SourceEvidencePanel } from './SourceEvidencePanel';
 export function SourceForm({ project, update, setError, setNotice }: { project: Project; update: (p: Project) => void; setError: (s: string) => void; setNotice: (s: string) => void }) {
   const [title, setTitle] = useState(''); const [url, setUrl] = useState(''); const [body, setBody] = useState('');
   const [publicUse, setPublicUse] = useState(false); const [externalUse, setExternalUse] = useState(false);
   const [fileName, setFileName] = useState(''); const [fileLoading, setFileLoading] = useState(false);
+  const [sourceType, setSourceType] = useState<Source['sourceType']>('user');
+  const [retrieval, setRetrieval] = useState<Source['retrieval']>('partial');
+  const [locator, setLocator] = useState(''); const [publishedAt, setPublishedAt] = useState('');
+  const [interest, setInterest] = useState('미확인');
   const addSource = () => {
     if (fileName && project.sources.filter(s => s.fileName).length >= FILE_LIMITS.projectFiles) { setError('프로젝트당 파일은 다섯 개까지 사용할 수 있습니다.'); return; }
     if (!title.trim() || !body.trim()) { setError('자료 이름과 실제 본문을 넣어 주세요. 링크만으로 원문 확인이 끝나지 않습니다.'); return; }
@@ -18,15 +21,14 @@ export function SourceForm({ project, update, setError, setNotice }: { project: 
       if (url.trim()) { const parsed = new URL(url.trim()); if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('invalid url'); }
       const source: Source = {
         id: crypto.randomUUID(), projectId: project.id, title: title.trim(), url: url.trim() || null,
-        excerpt: body.trim(), body: body.trim(), sourceType: 'user', retrieval: 'user_provided',
-        origin: 'direct_input', publishedAt: null, collectedAt: new Date().toISOString(), externalAiAllowed: externalUse,
-        publicationAllowed: publicUse, fileName: fileName || undefined, hash: fingerprint(body.trim()),
+        excerpt: body, body, sourceType, retrieval,
+        origin: 'direct_input', publishedAt: publishedAt || null, collectedAt: new Date().toISOString(), externalAiAllowed: externalUse,
+        publicationAllowed: publicUse, fileName: fileName || undefined, hash: fingerprint(body),
       };
-      update({ ...project, sources: [...project.sources, source], evidenceRevision: project.evidenceRevision + 1,
-        manualResearchRequestId: null, manualContentRequestId: null,
-        documents: markStale(project) });
+      update(storeEvidenceSource(project, source, { method: fileName ? 'file_text' : 'manual_excerpt',
+        locator, coverage: 'excerpt', modelScope: [], conditionScope: [], interest }));
       setTitle(''); setBody(''); setFileName(''); setUrl(''); setExternalUse(false); setPublicUse(false); setError(''); setNotice('자료를 저장했습니다. 이전 조사 요청문은 무효가 되었습니다. 사실과 출처를 확인해 주세요.');
-    } catch { setError('링크를 정확한 https:// 또는 http:// 주소로 입력해 주세요.'); }
+    } catch (error) { setError(error instanceof Error ? error.message : '자료를 저장하지 못했습니다.'); }
   };
 
   const fileChanged = async (file?: File) => {
@@ -47,14 +49,20 @@ export function SourceForm({ project, update, setError, setNotice }: { project: 
         <div className="field"><label htmlFor="source-file">또는 파일로 가져오기</label><input id="source-file" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf" onChange={e => void fileChanged(e.target.files?.[0])} />
           {fileLoading && <span role="status">자료에서 글자를 읽고 있습니다…</span>}</div>
         <div className="field"><label htmlFor="source-body">실제 원문</label><textarea id="source-body" value={body} onChange={e => setBody(e.target.value)} placeholder="확인할 문장과 적용 조건을 원문 그대로 붙여넣어 주세요." /></div>
+        <label className="field">자료 종류<select value={sourceType} onChange={e => setSourceType(e.target.value as Source['sourceType'])}><option value="user">사용자 자료</option><option value="official">제조사 공식 발표</option><option value="review">개인 경험 후기</option><option value="independent">독립 평가</option><option value="test">시험 원문</option></select></label>
+        <label className="field">수집 결과<select value={retrieval} onChange={e => setRetrieval(e.target.value as Source['retrieval'])}><option value="partial">일부 원문 확보</option><option value="user_provided">사용자 제공 원문</option><option value="fetched">본문 수집 성공</option><option value="failed">수집 실패</option></select></label>
+        <label className="field">확보한 본문 범위<input value={locator} onChange={e => setLocator(e.target.value)} placeholder="예: 공간 활용 단락의 첫 문장, 이미지·기타 영역 미수집" /></label>
+        <label className="field">게시일 (미확인이면 비움)<input type="date" value={publishedAt} onChange={e => setPublishedAt(e.target.value)} /></label>
+        <label className="field">이해관계·표본 한계<input value={interest} onChange={e => setInterest(e.target.value)} /></label>
         <label className="row small"><input type="checkbox" checked={publicUse} onChange={e => setPublicUse(e.target.checked)} />이 자료를 공개 문구의 근거로 써도 됩니다</label>
         <label className="row small"><input type="checkbox" checked={externalUse} onChange={e => setExternalUse(e.target.checked)} />이 자료를 외부 AI 조사 요청문에 넣어도 됩니다</label>
         <p className="small muted">확인하지 않은 자료는 공개 문구에 사용하지 않습니다.</p>
         <button className="button secondary" onClick={addSource} type="button">자료 저장하기</button>
         {!!project.sources.length && <details><summary>저장한 자료 {project.sources.length}개</summary><ul className="list">
-          {project.sources.map(source => <li key={source.id}><strong>{source.title}</strong> · {source.retrieval === 'fetched' ? '본문 확인' : '사용자 제공'}
+          {project.sources.map(source => <li key={source.id}><strong>{source.title}</strong> · {source.retrieval === 'failed' ? '수집 실패' : source.retrieval === 'partial' ? '일부 확보' : '원문 저장'}
             {source.url && <> · <a className="source-link" href={source.url} target="_blank" rel="noreferrer">원문 열기</a></>}
             {!source.publicationAllowed && <span className="badge warn">공개 문구 사용 미확인</span>}
+            <SourceEvidencePanel key={source.id} project={project} source={source} update={update} onError={setError} />
           </li>)}
         </ul></details>}
       </section>

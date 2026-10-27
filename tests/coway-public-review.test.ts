@@ -1,3 +1,5 @@
+import { captureSource } from '../src/domain/analysis/source-audit';
+import { fingerprint } from '../src/domain/text';
 import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
@@ -71,7 +73,15 @@ describe('트리플체어2 슬림 공개 자료의 수동 경로', () => {
     const imported = importResearch(start, research);
     expect(imported.claims.every(claim => claim.status === 'unreviewed')).toBe(true);
     const connected = attachOriginalText(imported, imported.sources[0].id, pressExcerpt, true);
-    const verified = verifyClaim(connected, connected.claims[0].id);
+    // Real release excerpt: preserve exact quoted text and manufacturer-only scope.
+    const source = connected.sources[0];
+    source.body = '코웨이, ‘비렉스 트리플체어2 슬림’ 출시\n' + pressExcerpt;
+    source.hash = fingerprint(source.body);
+    source.collectedAt = new Date().toISOString(); source.retrieval = 'partial';
+    connected.sources[0] = captureSource(source, { method: 'manual_excerpt', locator: '제목과 부피 비교 문장만', coverage: 'excerpt',
+      modelScope: [product], conditionScope: ['트리플체어 무빙형 대비 부피'], interest: '제조사 발표, 독립 시험 아님' });
+    connected.claims[0].conditions = '트리플체어 무빙형 대비 부피';
+    const verified = verifyClaim(connected, connected.claims[0].id, '제조사 발표 문구와 부피 비교 범위만 확인했습니다. 개별 모델·설치 면적·독립 효과는 미확인입니다.');
     expect(verified.claims[1].status).toBe('unreviewed');
     const approved = approveInsight(reviseInsight(verified, '옵션별 안마 범위를 먼저 설명하고 부피 9%를 바닥 면적 절감으로 쓰지 마세요.'));
     const { project: requested, prompt } = prepareContent(approved);

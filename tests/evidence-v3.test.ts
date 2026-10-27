@@ -1,3 +1,4 @@
+import { reviewSyntheticEvidence } from './helpers/synthetic-evidence';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,7 +13,7 @@ function grounded() {
   const p = base();
   p.sources = [{ id: 's', projectId: p.id, title: '허구 시험 문서', url: null, excerpt: '실내 시험에서 용량 1L입니다.', body: '실내 시험에서 용량 1L입니다.', sourceType: 'test', retrieval: 'user_provided', origin: 'direct_input', publishedAt: null, collectedAt: p.createdAt, externalAiAllowed: true, publicationAllowed: true, hash: 'h' }];
   p.claims = [{ id: 'c', projectId: p.id, statement: '용량 1L', quote: '실내 시험에서 용량 1L입니다.', conditions: '실내 시험', subject: p.name, sourceId: 's', status: 'supported', reviewedBy: 'human' }];
-  return p;
+  return reviewSyntheticEvidence(p);
 }
 function doc(p: Project, text: string, refs = ['c']): ChannelDocument { return { id: 'd', channel: 'ad_copy', revision: 1, evidenceRevision: p.evidenceRevision, status: 'needs_review', reviewedBlocks: {}, validationHash: null, warnings: [], updatedAt: p.createdAt, blocks: [{ id: 'b', kind: 'paragraph', text, claimRefs: refs }] }; }
 

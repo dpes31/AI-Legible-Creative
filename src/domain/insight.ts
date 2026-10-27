@@ -1,4 +1,5 @@
 import type { Project } from './schema';
+import { isVerifiedClaim } from './analysis/source-audit';
 
 export function insightCurrent(project: Project): boolean {
   return project.insight.approval !== 'pending' && project.insight.inputRevision === project.inputRevision &&
@@ -16,7 +17,7 @@ export function reviseInsight(project: Project, feedback: string): Project {
 }
 
 export function hasUsableEvidence(project: Project): boolean {
-  return project.claims.some(c => c.status === 'supported' && c.target !== 'competitor' && c.target !== 'unresolved' &&
+  return project.claims.some(c => isVerifiedClaim(project, c) && c.target !== 'competitor' && c.target !== 'unresolved' &&
     project.sources.some(s => s.id === c.sourceId && s.publicationAllowed && s.externalAiAllowed && s.origin !== 'external_response'));
 }
 
