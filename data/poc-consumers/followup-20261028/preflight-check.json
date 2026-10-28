@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-10-28T11:18:24.250Z",
+  "kind": "actual_excerpt_domain_preflight_not_model_quality_or_UI",
+  "baselineSha256": "58d48da4f78977256982e28e8ecd97f9577a642b92fa8264616e8a70d21208cb",
+  "baselinePreserved": true,
+  "importedRows": 21,
+  "sourceRecords": 21,
+  "threadGroups": 18,
+  "duplicateReimportRows": 21,
+  "rightsApprovedRows": 0,
+  "eligibleRows": 0,
+  "orderConditionsChecked": [
+    "forward",
+    "reverse",
+    "hash_order"
+  ],
+  "eachHeldExcludedRows": 21,
+  "promptsCreated": 0,
+  "actualExternalExecutions": 0,
+  "modelResponses": 0,
+  "analysisAccuracy": null,
+  "humanSemanticReview": false
+}
