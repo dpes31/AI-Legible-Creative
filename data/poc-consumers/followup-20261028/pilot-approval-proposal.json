@@ -1,0 +1,80 @@
+{
+  "createdAt": "2026-10-28T12:00:00.661537Z",
+  "status": "proposal_not_approved_not_executable",
+  "currentlyEligibleIds": [],
+  "currentlyTransmittedIds": [],
+  "conditionalCandidateIds": [
+    "B01",
+    "S01",
+    "B08",
+    "S03",
+    "S04",
+    "S06"
+  ],
+  "candidateContent": [
+    {
+      "id": "B01",
+      "excerptSha256": "9a5157c5c3bead40653cefaee2ce5d380c3e20fc966266abbb4b1ec0835b934c",
+      "sourceFile": "data/poc-consumers/public-excerpts-20261028.json",
+      "sourceArrayIndex": 0,
+      "rightsStatus": "추가 확인 필요",
+      "userApproval": "pending"
+    },
+    {
+      "id": "S01",
+      "excerptSha256": "1f83799b6925ff5819dfa30e7ed07339e76453095a42f72720922e499e9a6baf",
+      "sourceFile": "data/poc-consumers/followup-20261028/supplemental-excerpts.json",
+      "sourceArrayIndex": 0,
+      "rightsStatus": "추가 확인 필요",
+      "userApproval": "pending"
+    },
+    {
+      "id": "B08",
+      "excerptSha256": "dff4246c42e4dc37cb0ddac885de60f9dce3ae5af88131f6fce4c58dbe60aa18",
+      "sourceFile": "data/poc-consumers/public-excerpts-20261028.json",
+      "sourceArrayIndex": 7,
+      "rightsStatus": "추가 확인 필요",
+      "userApproval": "pending"
+    },
+    {
+      "id": "S03",
+      "excerptSha256": "bdc6483c569b3885de2321e2d3c6b1a12db93c6c764c5c0a68a829f1c0f8c420",
+      "sourceFile": "data/poc-consumers/followup-20261028/supplemental-excerpts.json",
+      "sourceArrayIndex": 2,
+      "rightsStatus": "추가 확인 필요",
+      "userApproval": "pending"
+    },
+    {
+      "id": "S04",
+      "excerptSha256": "ca43456aeb1699e304d1271050688b2d5047f3e76f6a101656e7f7ddba852a4b",
+      "sourceFile": "data/poc-consumers/followup-20261028/supplemental-excerpts.json",
+      "sourceArrayIndex": 3,
+      "rightsStatus": "추가 확인 필요",
+      "userApproval": "pending"
+    },
+    {
+      "id": "S06",
+      "excerptSha256": "317d8e396b1bb053cfa7f9e79cb9e3ab78cd610e2ba1579c4ae08c39fa94dedb",
+      "sourceFile": "data/poc-consumers/followup-20261028/supplemental-excerpts.json",
+      "sourceArrayIndex": 5,
+      "rightsStatus": "추가 확인 필요",
+      "userApproval": "pending"
+    }
+  ],
+  "serviceProposal": "ChatGPT Work on web, user-operated manual new conversations",
+  "modelCandidate": "GPT-6.1 Sol",
+  "reasoningCandidate": "Medium",
+  "accountAvailability": "unverified_no_account_access",
+  "internalVersion": "unknown_not_exposed",
+  "apiCalls": 0,
+  "extraPurchaseAuthorized": false,
+  "orders": [
+    "forward",
+    "reverse",
+    "hash_order"
+  ],
+  "actualInputHash": null,
+  "actualPromptHashes": [],
+  "actualResponses": [],
+  "approvalGate": "적법한 이용 근거·비식별·사용자 승인·서비스/모델 실제 표시 확인 후 정확 전송 manifest와 요청문을 확정하고 실행 승인 전에는 보내지 않음"
+}
