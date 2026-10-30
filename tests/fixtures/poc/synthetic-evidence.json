@@ -1,0 +1,28 @@
+{
+  "collectionMethod": "SYNTHETIC ONLY: authored regression input, no real consumer or product source.",
+  "release": {
+    "title": "허구 검수 체어 가상 시험 공지",
+    "url": "https://official.example.test/notices/fictional-1",
+    "publishedAt": "2024-01-01",
+    "body": "허구 검수 체어 FX-A01 가정 문서\n허구 검수 체어 FX-A01은 가상 비교 상자 대비 시험 상자 부피를 9% 작게 설정한 허구 대상이다.",
+    "quote": "허구 검수 체어 FX-A01은 가상 비교 상자 대비 시험 상자 부피를 9% 작게 설정한 허구 대상이다.",
+    "scope": "허구로 작성한 첫 시험 문장. 실제 제품이나 실험이 아니다.",
+    "subject": "허구 검수 체어 FX-A01",
+    "conditions": "가상 비교 상자 대비 시험 상자 부피",
+    "interest": "SYNTHETIC ONLY — 실제 제조사 발표 아님",
+    "statement": "허구 검수 체어 FX-A01의 가상 비교 상자 대비 시험 상자 부피 9% 감소 가정",
+    "note": "허구 문장의 숫자와 비교 조건만 대조하는 회귀시험입니다. 실제 제품 성능이나 소비자 분석의 의미 승인이 아닙니다."
+  },
+  "review": {
+    "title": "허구 사용자 휴대 상자 경험",
+    "url": "https://forum.example.test/fictional/1",
+    "publishedAt": "2024-01-02",
+    "body": "가상의 휴대 상자 사용 후 파란 손잡이가 구분하기 쉬웠다는 허구 발언이다.",
+    "quote": "가상의 휴대 상자 사용 후 파란 손잡이가 구분하기 쉬웠다는 허구 발언이다.",
+    "scope": "새로 작성한 허구 시험 단락 전체. 실제 소비자 없음.",
+    "subject": "허구 휴대 상자",
+    "conditions": "",
+    "interest": "SYNTHETIC ONLY — 실제 후기/구매 아님",
+    "statement": "허구 휴대 상자가 모든 사용자에게 장기 내구성을 보장한다"
+  }
+}

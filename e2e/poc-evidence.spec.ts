@@ -1,8 +1,9 @@
+// SYNTHETIC ONLY: no real source, consent or model execution.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 test.use({ actionTimeout: 10000 });
-const data = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/poc/public-excerpts.json'), 'utf8'));
+const data = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/poc/synthetic-evidence.json'), 'utf8'));
 
 async function create(page: Page) {
   await page.goto('/');
@@ -16,7 +17,7 @@ async function addSource(page: Page, item: typeof data.release, kind: string, re
   if ((await sourceFold.getAttribute('open')) === null) await sourceFold.locator(':scope > summary').click();
   await page.getByLabel('자료 이름', { exact: true }).fill(item.title);
   await page.getByLabel('원문 링크, 있다면').fill(item.url);
-  if (kind === 'official') await page.getByLabel('발행자 (미확인이면 비움)').fill('코웨이');
+  if (kind === 'official') await page.getByLabel('발행자 (미확인이면 비움)').fill('허구 발행자');
   await page.getByLabel('실제 원문', { exact: true }).fill(item.body);
   await page.getByLabel('자료 종류', { exact: true }).selectOption(kind);
   await page.getByLabel('수집 결과', { exact: true }).selectOption(retrieval);
@@ -54,7 +55,7 @@ async function backup(page: Page) {
   const download = await event; return JSON.parse(readFileSync((await download.path())!, 'utf8'));
 }
 
-test('실제 공개 발췌: UI 가져오기·SHA 스냅샷·주장 연결·사람 검토·재열기', async ({ page }, testInfo) => {
+test('허구 자료 회귀: UI 가져오기·SHA 스냅샷·주장 연결·사람 검토·재열기', async ({ page }, testInfo) => {
   test.setTimeout(90000);
   await create(page);
   let li = await addSource(page, data.release, 'official');
@@ -67,7 +68,7 @@ test('실제 공개 발췌: UI 가져오기·SHA 스냅샷·주장 연결·사�
   await article.getByLabel('의미 검토 이유와 한계').fill(data.release.note);
   await article.getByRole('button', { name: '원문과 의미를 직접 대조했어요' }).click();
   await expect(article).toContainText('자동 대조 + 사람 의미 검토 기록');
-  // The second real source is kept as a personal observation, never product efficacy.
+  // Authored fictitious observation; never real consumer or efficacy evidence.
   li = await addSource(page, data.review, 'review');
   await claim(li, data.review);
   await expect(evidence.locator('article').filter({ has: page.getByRole('heading', { name: data.review.statement, exact: true }) })).toContainText('보류');
@@ -75,16 +76,16 @@ test('실제 공개 발췌: UI 가져오기·SHA 스냅샷·주장 연결·사�
   expect(saved.sources).toHaveLength(2);
   expect(saved.sources.every((s: { snapshots: unknown[] }) => s.snapshots.length > 0)).toBe(true);
   expect(saved.claims[0].status).toBe('supported'); expect(saved.claims[1].status).toBe('insufficient');
-  expect(saved.sources[0].snapshots.at(-1).sourceMetadata.publisher).toBe('코웨이');
+  expect(saved.sources[0].snapshots.at(-1).sourceMetadata.publisher).toBe('허구 발행자');
   await page.goto('/review'); await page.reload(); await page.locator('#evidence > summary').click();
   await expect(page.locator('#evidence')).toContainText('자동 대조 + 사람 의미 검토 기록');
   await expect(page.locator('#evidence')).toContainText('적용 조건이 없거나');
-  await page.screenshot({ path: testInfo.outputPath('public-evidence-reopened.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('synthetic-evidence-reopened.png'), fullPage: true });
   await testInfo.attach('public-evidence-status', { body: JSON.stringify({ sourceCount: saved.sources.length,
     claims: saved.claims.map((c: { status: string; evidenceHold?: unknown }) => ({ status: c.status, evidenceHold: c.evidenceHold })) }), contentType: 'application/json' });
 });
 
-test('실제 승인 자료의 출처 분류·발행자 변경: 이전 승인 무효화와 UI 재열기', async ({ page, browser }, testInfo) => {
+test('허구 승인 자료의 출처 분류·발행자 변경: 이전 승인 무효화와 UI 재열기', async ({ page, browser }, testInfo) => {
   test.setTimeout(120000);
   await create(page);
   const li = await addSource(page, data.release, 'official');
@@ -137,7 +138,7 @@ test('실제 승인 자료의 출처 분류·발행자 변경: 이전 승인 무
   }
 });
 
-test('실제 보도자료 파생 변조: 숫자·hash·실패·모델·조건과 백업 재열기 차단', async ({ page, browser }, testInfo) => {
+test('허구 원문 변조: 숫자·hash·실패·모델·조건과 백업 재열기 차단', async ({ page, browser }, testInfo) => {
   test.setTimeout(180000);
   await create(page); const li = await addSource(page, data.release, 'official'); await sourceScope(li, data.release);
   await claim(li, data.release, data.release.statement.replace('9%', '19%'));
@@ -155,7 +156,7 @@ test('실제 보도자료 파생 변조: 숫자·hash·실패·모델·조건과
     if (mutation === 'hash') corrupt.sources[0].hash = 'fnv1a:changed';
     if (mutation === 'sha256') corrupt.sources[0].snapshots.at(-1).sha256 = 'sha256:' + '0'.repeat(64);
     if (mutation === 'failed') corrupt.sources[0].retrieval = 'failed';
-    if (mutation === 'model') corrupt.claims[0].subject = '미확인 모델 MC-R02S';
+    if (mutation === 'model') corrupt.claims[0].subject = '미확인 허구 모델 FX-B99';
     if (mutation === 'conditions') corrupt.claims[0].conditions = '';
     if (mutation === 'missingSnapshot') { delete corrupt.sources[0].snapshots; delete corrupt.sources[0].activeSnapshotId; }
     const context = await browser.newContext(); const restored = await context.newPage();

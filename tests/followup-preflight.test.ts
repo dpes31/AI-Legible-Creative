@@ -4,18 +4,16 @@ import { createHash } from 'node:crypto';
 import { newProject } from '../src/domain/schema';
 import { importConsumerExcerptCorpus, incidentKey } from '../src/domain/consumer-evidence';
 import { discoveryRowCheck, prepareQuestionDiscovery } from '../src/domain/analysis/question-discovery';
-it('real excerpts: preserve baseline, import 21 rows, 18 thread groups; deny all unapproved external runs', () => {
- const dir='data/poc-consumers/followup-20261028/';
- const baseline=readFileSync('data/poc-consumers/public-excerpts-20261028.json','utf8');
- const supplement=readFileSync(dir+'supplemental-excerpts.json','utf8');
- const ledger=JSON.parse(readFileSync(dir+'collection-ledger.json','utf8'));
- const manifest=JSON.parse(readFileSync(dir+'preflight-manifest.json','utf8'));
- expect(createHash('sha256').update(baseline).digest('hex')).toBe(manifest.baselineSha256);
- JSON.parse(supplement).excerpts.forEach((e: { text: string }, i: number)=>expect(createHash('sha256').update(e.text).digest('hex')).toBe(ledger.sources[i].sha256));
- let p=newProject({name:'권한 미승인 실제 발췌 사전 대조',kind:'product',description:'',officialUrl:'',objective:'feature',audience:'',audienceUndecided:true,selectedChannels:['blog'],mode:'manual'});
+it('synthetic corpus: verify bytes, import 21 rows/18 thread groups, deny all unapproved runs', () => {
+ const baseline=readFileSync('tests/fixtures/poc/synthetic-consumers.json','utf8');
+ const supplement=readFileSync('tests/fixtures/poc/synthetic-supplement.json','utf8');
+ const all=[...JSON.parse(baseline).excerpts,...JSON.parse(supplement).excerpts];
+ expect(all.every((e: { text: string })=>createHash('sha256').update(e.text).digest('hex').length===64)).toBe(true);
+ let p=newProject({name:'허구 자료 사전 대조',kind:'product',description:'',officialUrl:'',objective:'feature',audience:'',audienceUndecided:true,selectedChannels:['blog'],mode:'manual'});
  p=importConsumerExcerptCorpus(p,baseline); p=importConsumerExcerptCorpus(p,supplement);
  expect(p.consumerObservations).toHaveLength(21); expect(p.sources).toHaveLength(21);
  expect(importConsumerExcerptCorpus(p,supplement).consumerObservations).toHaveLength(21);
+ p.sources.forEach((source,i)=>expect(source.snapshots?.at(-1)?.sha256).toBe('sha256:'+createHash('sha256').update(all[i].text).digest('hex')));
  expect(new Set(p.sources.map(s=>incidentKey(s.url!))).size).toBe(18);
  expect(p.consumerObservations.every(r=>!discoveryRowCheck(p,r.id).manifest)).toBe(true);
  for(const order of ['forward','reverse','hash_order'] as const) p=prepareQuestionDiscovery(p,{rowIds:p.consumerObservations.map(r=>r.id),provider:'',model:'',order});

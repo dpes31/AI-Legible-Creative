@@ -11,3 +11,12 @@ next-env.d.ts
 !.env.example
 .vercel/
 .DS_Store
+
+# Only reviewed synthetic runs may generate public CI evidence.
+public-test-results/
+private-evidence/
+private-test-results/
+
+# Real source material is not a public code/test input.
+data/poc-consumers/
+tests/fixtures/poc/public-excerpts.json

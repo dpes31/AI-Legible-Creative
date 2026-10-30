@@ -2,9 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import type { Project } from '../src/domain/schema';
 
-// Public source excerpts are real. All model responses/consent clicks below are
-// authored UI test inputs, not real AI analysis or actual permission grants.
-const corpus = readFileSync('data/poc-consumers/public-excerpts-20261028.json', 'utf8');
+// SYNTHETIC ONLY: source text, model replies and consent/review clicks are authored tests.
+const corpus = readFileSync('tests/fixtures/poc/synthetic-consumers.json', 'utf8');
 async function backup(page: Page): Promise<Project> {
   await expect(page.getByRole('status').filter({ hasText: '이 브라우저에 저장됨' })).toBeVisible();
   await page.goto('/settings'); const event = page.waitForEvent('download');
@@ -12,11 +11,11 @@ async function backup(page: Page): Promise<Project> {
   return JSON.parse(readFileSync((await (await event).path())!, 'utf8'));
 }
 async function setup(page: Page) {
-  await page.goto('/'); await page.getByLabel('무엇을 알리고 싶으신가요?').fill('질문 발견 UI 검수');
+  await page.goto('/'); await page.getByLabel('무엇을 알리고 싶으신가요?').fill('허구 입력 질문 발견 UI 회귀');
   await page.getByRole('button', { name: '브랜드 분석 시작' }).click();
   const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: '소비자 원문에서 질문 발견', exact: true }) });
   await panel.getByText('공개 소비자 발췌와 출처 연결', { exact: true }).click();
-  await panel.getByLabel('소비자 발췌 묶음 JSON 가져오기').setInputFiles({ name: 'public-consumers.json', mimeType: 'application/json', buffer: Buffer.from(corpus) });
+  await panel.getByLabel('소비자 발췌 묶음 JSON 가져오기').setInputFiles({ name: 'synthetic-consumers.json', mimeType: 'application/json', buffer: Buffer.from(corpus) });
   await expect(panel.getByRole('status')).toContainText('실제 발췌 묶음을 보관했습니다');
   await panel.getByText('발견할 원자료 선택 (12행)', { exact: true }).click();
   await panel.getByRole('button', { name: '모든 행 선택', exact: true }).click();
@@ -52,15 +51,15 @@ async function setup(page: Page) {
   const unknown = { text: '', basis: 'unknown', evidenceIndexes: [] }, row = run.manifest[0];
   const response = { contract: 'alc.question-discovery.v1', runId: run.id, inputHash: run.inputHash,
     questions: [{ ref: 'Q1', text: row.text, provenance: 'observed', evidence: [{ rowId: row.rowId, quote: row.text,
-      start: 0, end: row.text.length, role: 'support' }], reason: '공개 원문의 질문 표현 존재를 시험합니다. AI 발견 결과가 아닙니다.',
+      start: 0, end: row.text.length, role: 'support' }], reason: '허구 원문의 질문 연결만 시험합니다. 실제 AI 발견이 아닙니다.',
       alternativeInterpretations: ['구매 의도나 대표 니즈의 증거는 아닙니다.'],
       context: { situation: unknown, task: unknown, barrier: unknown, expectedOutcome: unknown },
       unmetNeed: 'unknown', decisionImpact: 'unknown', impactReason: '표본 부족' }],
-    rowDispositions: [{ rowId: row.rowId, status: 'linked', questionRefs: ['Q1'], reason: '실제 원문의 질문 문구 연결 시험' }] };
+    rowDispositions: [{ rowId: row.rowId, status: 'linked', questionRefs: ['Q1'], reason: '허구 질문 문구 연결 회귀' }] };
   return { panel, runFold, response };
 }
 
-test('실제 원자료 UI: 12개 발췌·권한 분리·실패/정상 응답 원본·검토·재열기', async ({ page }, info) => {
+test('허구 자료 UI: 12개 발췌·권한 분리·실패/정상 응답 원본·검토·재열기', async ({ page }, info) => {
   test.setTimeout(180000); const { panel, runFold, response } = await setup(page);
   await runFold.getByLabel('질문 발견 원본 응답').fill('중단된 {');
   await runFold.getByRole('button', { name: '요청문 외부 제공 기록', exact: true }).click();
@@ -89,7 +88,7 @@ test('실제 원자료 UI: 12개 발췌·권한 분리·실패/정상 응답 원
   expect(retried.questionDiscoveryRuns[1].attempts).toHaveLength(2);
 });
 
-test('실제 원자료 UI: 다른 질문 표기 보류와 메타데이터·권한·요청문 변경 재열기 차단', async ({ page, browser }, info) => {
+test('허구 자료 UI: 다른 질문 표기 보류와 메타데이터·권한·요청문 변경 재열기 차단', async ({ page, browser }, info) => {
   test.setTimeout(240000); const { runFold, response } = await setup(page);
   response.questions[0].text = '원문에 없는 시험용 다른 질문?';
   await runFold.getByLabel('질문 발견 원본 응답').fill(JSON.stringify(response));

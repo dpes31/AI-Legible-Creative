@@ -44,8 +44,8 @@ function accepted(p = prepare(setup())) {
 }
 
 describe('소비자 전용 발견과 실행 기록', () => {
-  it('실제 공개 발췌 12건은 질문 결론 없이 가져오며 한 행 동의가 다른 행에 퍼지지 않는다', async () => {
-    const raw = readFileSync('data/poc-consumers/public-excerpts-20261028.json', 'utf8');
+  it('허구 발췌 12건은 질문 결론 없이 가져오며 한 행 동의가 다른 행에 퍼지지 않는다', async () => {
+    const raw = readFileSync('tests/fixtures/poc/synthetic-consumers.json', 'utf8');
     const empty = newProject({ name: '검수용 프로젝트', kind: 'product', description: '', officialUrl: '', objective: 'feature',
       audience: '', audienceUndecided: true, selectedChannels: ['blog'], mode: 'manual' });
     let p = importConsumerExcerptCorpus(empty, raw);
@@ -93,11 +93,14 @@ describe('소비자 전용 발견과 실행 기록', () => {
     p = importQuestionDiscovery(p, run.id, JSON.stringify(raw));
     expect(p.questionCandidates).toHaveLength(0); expect(p.questionDiscoveryRuns[0].attempts[0].errors.join()).toContain('소비자 원문');
   });
-  it('빈 응답·JSON 오류·다른 응답을 덮어쓰지 않고 각각 저장하며 중복은 다시 반영하지 않는다', () => {
+  it('빈 응답·오류·중단·거절 원본은 재열기에도 보존하며 중복 반영하지 않는다', async () => {
     let p = prepare(setup()); const id = p.questionDiscoveryRuns[0].id;
-    for (const raw of ['', '중단된 {', '{"알수없음":true}']) p = importQuestionDiscovery(p, id, raw);
-    expect(p.questionDiscoveryRuns[0].attempts).toHaveLength(3); expect(p.questionCandidates).toHaveLength(0);
-    p = importQuestionDiscovery(p, id, '중단된 {'); expect(p.questionDiscoveryRuns[0].attempts).toHaveLength(3);
+    const originals = ['', '중단된 {', '{"알수없음":true}', '허구 서비스 거절: INPUT_DECLINED'];
+    for (const raw of originals) p = importQuestionDiscovery(p, id, raw);
+    expect(p.questionDiscoveryRuns[0].attempts.map(a => a.raw)).toEqual(originals); expect(p.questionCandidates).toHaveLength(0);
+    p = importQuestionDiscovery(p, id, '중단된 {'); expect(p.questionDiscoveryRuns[0].attempts).toHaveLength(4);
+    const saved = await saveProject(p, null), reopened = (await loadProject(saved.id))!;
+    expect(reopened.questionDiscoveryRuns[0].attempts.map(a => a.raw)).toEqual(originals);
   });
   for (const problem of ['offset', 'unknown_row', 'observed_rewrite', 'unmet', 'context', 'conflict'] as const) {
     it(problem + ': 출처 ID만으로 질문 해석을 승인하지 않는다', () => {
