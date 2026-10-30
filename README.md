@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 근거 있는 브랜드 문구 — 검수 브랜치
 
-## Getting Started
-
-First, run the development server:
+사용자는 **정보 입력 → 조사 응답 → 핵심 인사이트 검수·수정 → 작성 응답 → 결과 검수**로 진행합니다. 수동 방식은 API 키 없이 완주합니다. 다섯 기본 채널과 선택한 후기 영상은 독립적으로 편집·복사할 수 있고, 선택한 문서를 하나의 Word 파일로 받습니다. 코드의 기능 검수 예시는 실제 상품이나 실적이 아닌 허구 자료입니다.
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 `http://localhost:3000`을 엽니다. 입력과 결과는 **그 브라우저의 IndexedDB**에 남습니다. 설정에서 현재 프로젝트 JSON 백업, 예전 앱의 원본 백업 및 다른 주소에서 받은 파일 가져오기를 이용할 수 있습니다. 다른 기기와 자동 동기화하지 않습니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+검색어·검색 지표·상담·리뷰 등 구조화된 소비자 자료는 분석 전후에 검수 화면에서 CSV·TSV·TXT·XLSX로 가져올 수 있습니다. 행 번호와 원본 셀, 기간·단위·표본 조건을 보관하며, 외부 AI 제공과 공개 콘텐츠 근거 사용을 따로 허용해야 합니다. 파일은 10MB, XLSX 압축 해제 후 50MB, 프로젝트당 5개까지입니다. 검색 키워드와 검색량은 실제 생성형 AI 프롬프트 빈도나 전체 수요를 뜻하지 않습니다. 업로드 원본 바이너리는 저장하지 않습니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npx playwright install chromium webkit
+npm run test:e2e
+npm run build
+```
 
-## Learn More
+브랜드·제품군·모델을 분리하고, 확인한 질문·근거·게시 URL과 게시 전 시험/게시 후 관찰을 보조 화면에서 축적합니다. 비렉스 여부는 사용자가 명시하며 유튜브 제목의 브랜드 표기에 반영됩니다. 수동 검수의 주장 의미 확인과 작성 품질은 사람이 실제 원문과 대조해야 합니다.
 
-To learn more about Next.js, take a look at the following resources:
+자동 분석용 서버 코드는 비용 차단이 기본입니다. 단계 실행 모의 검사와 Auth·RLS·예산 예약 SQL은 있지만 실제 서버 저장 결과 반영·비용 정산·재개가 완성되지 않아 유료 호출을 켤 수 없습니다. [설정 안내](docs/setup.md), [구조와 한계](docs/architecture.md), [검수 기록](docs/review-checklist.md)을 보세요.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+이 브랜치는 운영 환경을 바꾸지 않습니다. 메인 병합과 운영 배포는 별도 승인 이후입니다.

@@ -1,0 +1,48 @@
+name: 검수 브랜치 확인
+on:
+  push:
+    branches: [refactor/evidence-workflow-v2]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source SHA
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          actual_source_sha="$(git rev-parse HEAD)"
+          test "$actual_source_sha" = "$EXPECTED_SOURCE_SHA"
+          printf 'Validated source SHA: %s\n' "$actual_source_sha"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Public material boundary (fail closed while preservation is pending)
+        id: public-boundary
+        run: npm run check:public
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e
+      - run: npm run build
+      - name: Public artifact boundary
+        if: always() && steps.public-boundary.outcome == 'success'
+        id: artifact-boundary
+        run: npm run check:public-artifacts
+      - name: 허구 회귀 화면과 실패 기록만 보관
+        if: always() && steps.public-boundary.outcome == 'success' && steps.artifact-boundary.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: synthetic-review-evidence
+          path: public-test-results/
+          retention-days: 7
+          if-no-files-found: warn
