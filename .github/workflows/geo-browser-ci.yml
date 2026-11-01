@@ -1,0 +1,82 @@
+name: GEO one-time Chromium audit (synthetic only)
+
+on:
+  push:
+    branches:
+      - geo-browser-ci-20261101
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact one-time ref
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify branch, Vercel opt-out, approved patch package
+        env:
+          EXPECTED_PUSH_SHA: ${{ github.sha }}
+          EXPECTED_BRANCH: geo-browser-ci-20261101
+          EXPECTED_BASE_SHA: 3457995d3eacf14c4658649548fa6c98fcf9452a
+          PATCH_SHA256: cdc91e8675673b46813f1b39bdb5144067455867f27cb97eba103f6dc041684c
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_PUSH_SHA"
+          test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
+          node -e 'const c=require("./vercel.json"); if(c.git?.deploymentEnabled?.[process.env.GITHUB_REF_NAME] !== false)process.exit(1)'
+          printf '%s  %s\n' "$PATCH_SHA256" ci/approved-restoration-patches.tar.gz | sha256sum --check
+          test "$(tar -tzf ci/approved-restoration-patches.tar.gz | sort)" = "$(printf 'implementation.patch\nrestored-baseline.patch')"
+      - name: Reconstruct approved source and verify complete Git tree
+        env:
+          EXPECTED_BASE_SHA: 3457995d3eacf14c4658649548fa6c98fcf9452a
+          EXPECTED_TREE: 7782d393f15528cb5800b2674a6d8067c155198c
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/geo-patches"
+          tar -xzf ci/approved-restoration-patches.tar.gz -C "$RUNNER_TEMP/geo-patches"
+          git worktree add --detach "$RUNNER_TEMP/geo-approved-source" "$EXPECTED_BASE_SHA"
+          cd "$RUNNER_TEMP/geo-approved-source"
+          git apply --check "$RUNNER_TEMP/geo-patches/restored-baseline.patch"
+          git apply "$RUNNER_TEMP/geo-patches/restored-baseline.patch"
+          git apply --check "$RUNNER_TEMP/geo-patches/implementation.patch"
+          git apply "$RUNNER_TEMP/geo-patches/implementation.patch"
+          git add -A
+          git diff --cached --check
+          actual_tree="$(git write-tree)"
+          echo "Reconstructed approved tree: $actual_tree"
+          test "$actual_tree" = "$EXPECTED_TREE"
+          printf '%s\n' "GEO_APP_ROOT=$RUNNER_TEMP/geo-approved-source" >> "$GITHUB_ENV"
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Lockfile install
+        run: cd "$GEO_APP_ROOT" && npm ci
+      - name: Public material and synthetic test inputs boundary
+        run: cd "$GEO_APP_ROOT" && npm run check:public
+      - name: Type check
+        run: cd "$GEO_APP_ROOT" && npm run typecheck
+      - name: Unit/domain tests
+        run: cd "$GEO_APP_ROOT" && npm run test
+      - name: Official Playwright Chromium
+        run: cd "$GEO_APP_ROOT" && npx playwright install --with-deps chromium
+      - name: Browser E2E with synthetic fixture data
+        run: cd "$GEO_APP_ROOT" && npx playwright test --project=chromium
+      - name: Public artifact boundary
+        id: output_boundary
+        if: always()
+        run: cd "$GEO_APP_ROOT" && npm run check:public-artifacts
+      - name: Upload sanitized synthetic browser evidence
+        if: always() && steps.output_boundary.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: geo-onetime-chromium-synthetic
+          path: ${{ env.GEO_APP_ROOT }}/public-test-results/
+          if-no-files-found: warn
+          retention-days: 7
