@@ -1,4 +1,4 @@
-name: GEO one-time Chromium audit (synthetic only)
+name: GEO independent observation UI — one-time Chromium
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout exact one-time ref
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - name: Verify branch, Vercel opt-out, approved patch package
         env:
@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_PUSH_SHA"
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE_SHA"
+          test "$(git rev-parse HEAD^)" = "7bb4278d8bdb444f2765faf3cda7905d70f87a4e"
           node -e 'const c=require("./vercel.json"); if(c.git?.deploymentEnabled?.[process.env.GITHUB_REF_NAME] !== false)process.exit(1)'
           printf '%s  %s\n' "$PATCH_SHA256" ci/approved-restoration-patches.tar.gz | sha256sum --check
           test "$(tar -tzf ci/approved-restoration-patches.tar.gz | sort)" = "$(printf 'implementation.patch\nrestored-baseline.patch')"
@@ -52,6 +52,19 @@ jobs:
           echo "Reconstructed approved tree: $actual_tree"
           test "$actual_tree" = "$EXPECTED_TREE"
           printf '%s\n' "GEO_APP_ROOT=$RUNNER_TEMP/geo-approved-source" >> "$GITHUB_ENV"
+      - name: Apply approved UI patch and verify integration tree
+        env:
+          UI_PATCH_SHA256: bb4df3059216a75084d2f7814a9dff3eb88bd54ca501dde73a89a7e4a6e443ca
+          EXPECTED_UI_TREE: 0a2bf95ee380d7899ecdec26881201fe0b8fc87c
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' "$UI_PATCH_SHA256" ci/independent-observation-ui.patch | sha256sum --check
+          patch_file="$GITHUB_WORKSPACE/ci/independent-observation-ui.patch"
+          cd "$GEO_APP_ROOT"
+          git apply --check "$patch_file"
+          git apply --index "$patch_file"
+          git diff --cached --check
+          test "$(git write-tree)" = "$EXPECTED_UI_TREE"
       - name: Node 22
         uses: actions/setup-node@v4
         with:
@@ -67,7 +80,7 @@ jobs:
       - name: Official Playwright Chromium
         run: cd "$GEO_APP_ROOT" && npx playwright install --with-deps chromium
       - name: Browser E2E with synthetic fixture data
-        run: cd "$GEO_APP_ROOT" && npx playwright test --project=chromium
+        run: cd "$GEO_APP_ROOT" && npx playwright test --config="$GITHUB_WORKSPACE/ci/observation-ui.playwright.cjs" --project=chromium --workers=1 --retries=0
       - name: Public artifact boundary
         id: output_boundary
         if: always()
@@ -76,7 +89,8 @@ jobs:
         if: always() && steps.output_boundary.outcome == 'success'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: geo-onetime-chromium-synthetic
+          name: geo-independent-observation-ui-synthetic
           path: ${{ env.GEO_APP_ROOT }}/public-test-results/
           if-no-files-found: warn
           retention-days: 7
+
