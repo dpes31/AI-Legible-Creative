@@ -1,9 +1,9 @@
 diff --git a/e2e/consumer-review-ui.spec.ts b/e2e/consumer-review-ui.spec.ts
 new file mode 100644
-index 0000000..8dfa1d7
+index 0000000..73e7a39
 --- /dev/null
 +++ b/e2e/consumer-review-ui.spec.ts
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,146 @@
 +import { test, expect, type Page, type Locator } from '@playwright/test';
 +import { readFileSync } from 'node:fs';
 +import type { Project } from '../src/domain/schema';
@@ -147,10 +147,11 @@ index 0000000..8dfa1d7
 +  expect(p.observations).toHaveLength(0);
 +  await page.goto('/review');
 +  await page.locator('#consumer-observation-review-heading').click();
++  await panel.getByLabel('근거가 되는 소비자 원문 행').selectOption(p.consumerObservationReviews[0].evidence[0].rowId);
 +  await expect(panel).toContainText('외부 AI 제공: 허용되지 않음');
 +});
 diff --git a/scripts/public-test-inputs.json b/scripts/public-test-inputs.json
-index 1c821fd..bdd3c4f 100644
+index 1c821fd..b774cb6 100644
 --- a/scripts/public-test-inputs.json
 +++ b/scripts/public-test-inputs.json
 @@ -39,6 +39,7 @@
@@ -159,7 +160,7 @@ index 1c821fd..bdd3c4f 100644
      "tests/discovery-review-controls.test.ts": "3b22a6ae314dcfa79a718c7da76c4c09d060e1eb7062e3e55beefb114a2f8296",
 -    "tests/consumer-review.test.ts": "9495f895e65850e92da1ce4d8da8995f2f6a0641fad97dd02398febb5ef71296"
 +    "tests/consumer-review.test.ts": "9495f895e65850e92da1ce4d8da8995f2f6a0641fad97dd02398febb5ef71296",
-+    "e2e/consumer-review-ui.spec.ts": "11c0c09617ae34587ec3cf2929ae3d36cacceb157d6963b876df66322241553b"
++    "e2e/consumer-review-ui.spec.ts": "470e6ad85ab133d585c7a87a83c6c78fe5562ea746570526f3f44d65934d4c03"
    }
  }
 diff --git a/src/app/review/page.tsx b/src/app/review/page.tsx

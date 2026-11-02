@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_PUSH_SHA"
           test "$GITHUB_REF_NAME" = "$EXPECTED_BRANCH"
-          test "$(git rev-parse HEAD^)" = "7bb4278d8bdb444f2765faf3cda7905d70f87a4e"
+          test "$(git rev-parse HEAD^)" = "dd1c1063cddf11e5d74079c5385501679ded425f"
           node -e 'const c=require("./vercel.json"); if(c.git?.deploymentEnabled?.[process.env.GITHUB_REF_NAME] !== false)process.exit(1)'
           printf '%s  %s\n' "$PATCH_SHA256" ci/approved-restoration-patches.tar.gz | sha256sum --check
           test "$(tar -tzf ci/approved-restoration-patches.tar.gz | sort)" = "$(printf 'implementation.patch\nrestored-baseline.patch')"
@@ -54,8 +54,8 @@ jobs:
           printf '%s\n' "GEO_APP_ROOT=$RUNNER_TEMP/geo-approved-source" >> "$GITHUB_ENV"
       - name: Apply approved UI patch and verify integration tree
         env:
-          UI_PATCH_SHA256: bb4df3059216a75084d2f7814a9dff3eb88bd54ca501dde73a89a7e4a6e443ca
-          EXPECTED_UI_TREE: 0a2bf95ee380d7899ecdec26881201fe0b8fc87c
+          UI_PATCH_SHA256: 6f9dae437a16e8fac7122e60636983662962606bf392b99ffebd10a8fb72f556
+          EXPECTED_UI_TREE: 4405438884564f05c837e6a08523ae29ea0d15e4
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$UI_PATCH_SHA256" ci/independent-observation-ui.patch | sha256sum --check
